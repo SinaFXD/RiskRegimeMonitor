@@ -36,8 +36,9 @@ def reference(span=5, kdn=2, kup=3, thr=(0.60, 0.25, -0.25, -0.75)):
             ok = v.shift(LB - 1).notna()
             x = (v / v.rolling(LB, min_periods=1).max() - 1).where(ok)
         elif tr == 'CP10':
-            # spread only on days both rates exist (CP3M is sparse), then its 10-day mean
-            x = ((df['CP3M'] - df['TBILL3M']) * 100).rolling(10, min_periods=1).mean()
+            # spread only on days both rates exist (CP3M is sparse), then its 10-day mean; forward-filled over
+            # longer CP gaps like every other input, so one gap does not blank the 252-day z for a whole year
+            x = ((df['CP3M'] - df['TBILL3M']) * 100).rolling(10, min_periods=1).mean().ffill()
             x.iloc[:9] = np.nan
         else:
             x = c[ck]
@@ -147,13 +148,16 @@ def type_scores(D, TYPES):
         for key, op, thr in conds:
             s = 1 if op == '>' else -1
             if key == 'Y10|RY':
-                m_ = max(np.clip(D['Y10'], -1, 1), np.clip(D['RY'] - 0.5, -1, 1))
+                a_, b_ = np.clip(D['Y10'], -1, 1), np.clip(D['RY'] - 0.5, -1, 1)
+                m_ = np.nan if np.isnan(a_) or np.isnan(b_) else max(a_, b_)
             else:
                 if key == 'CRED-VOL': x = D['CREDIT'] - D['VOL']
                 elif key.startswith('|'): x = abs(D[key.strip('|')])
                 else: x = D[key]
                 m_ = float(np.clip((x - thr) * s, -1, 1))
             ms.append(m_)
+        if any(np.isnan(m_) for m_ in ms):     # an input is missing (e.g. Credit before Nov 2024): no score
+            res[code] = None; continue
         met = sum(1 for m_ in ms if m_ > 0)
         res[code] = (met, (np.mean(ms) + 1) / 2)
     return res

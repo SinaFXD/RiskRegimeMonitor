@@ -259,7 +259,7 @@ function renderOverview(el) {
     <div class="card hero c5 rc-${g.k}">
       <div class="eyebrow"><span class="live"></span>${L('رژیم تأییدشده', 'Confirmed regime')} · ${N(k.date)}${jalali(k.date)}</div>
       <div class="regime-name">${g.fa}</div>
-      <div class="regime-en">Raw signal: ${k.raw || '—'} · ${L(`${k.streak} روز پیاپی`, `${k.streak} days in a row`)}</div>
+      <div class="regime-en">Raw signal: ${k.raw || '—'} · ${pendTxt(k)}</div>
       ${guardBanner(k.guard)}
       <div class="scale" aria-label="${L('موقعیت RAI روی مقیاس رژیم', 'RAI position on the regime scale')}">
         <div class="scale-track">
@@ -284,7 +284,7 @@ function renderOverview(el) {
     <div class="c7"><div class="kpis">
       ${kpiTile('RAI (EMA)', N(f2(k.ema)), `<span class="delta ${k.d5 >= 0 ? 'up' : 'dn'}">${k.d5 >= 0 ? '▲' : '▼'} ${sg(k.d5)}</span> ${L('در ۵ روز', 'over 5 days')}`, null, L('Risk Appetite Index، هموارشده با EMA ۵ روزه', 'Risk Appetite Index, smoothed with a 5-day EMA'))}
       ${kpiTile(L('Percentile تاریخی', 'Historical percentile'), N(Math.round(k.pct * 100) + '%'), L(`پایین‌تر از ${N(Math.round((1 - k.pct) * 100) + '%')} روزهای ثبت‌شده`, `Below ${N(Math.round((1 - k.pct) * 100) + '%')} of recorded days`), k.pct, L('جایگاه RAI امروز در کل تاریخچه مدل', "Where today's RAI sits in the model's full history"))}
-      ${kpiTile(L('روز در رژیم', 'Days in regime'), N(k.days) + ` <small>${L('روز', 'days')}</small>`, L(`سیگنال خام: ${N(k.streak)} روز پیاپی`, `Raw signal: ${N(k.streak)} days in a row`), null, L('تعداد روزهایی که رژیم تأییدشده فعلی برقرار است', 'How many days the current confirmed regime has lasted'))}
+      ${kpiTile(L('روز در رژیم', 'Days in regime'), N(k.days) + ` <small>${L('روز', 'days')}</small>`, L(`سیگنال خام: ${pendTxt(k)}`, `Raw signal: ${pendTxt(k)}`), null, L('تعداد روزهایی که رژیم تأییدشده فعلی برقرار است', 'How many days the current confirmed regime has lasted'))}
       ${kpiTile('Breadth', N(Math.round(k.breadth * 100) + '%'), L('شاخص‌های با z مثبت', 'Indicators with positive z'), k.breadth, L('درصد شاخص‌هایی که سیگنال Risk-On دارند', 'Share of indicators signalling Risk-On'))}
       ${kpiTile('Raw RAI', N(f2(k.rai)), L('بدون هموارسازی', 'Unsmoothed'), null, L('میانگین وزنی امروز Categoryها، پیش از EMA', "Today's weighted mean of the categories, before the EMA"))}
       ${kpiTile(L('نوع اصلی رژیم', 'Primary regime type'), `<span style="font-size:20px">${prim.en}</span>`, `${N(prim.met + '/5')} ${L('شرط', 'conditions')} · Strength ${N(Math.round(prim.str * 100) + '%')}`, null, dx(prim, 'sig'))}
@@ -309,7 +309,7 @@ function renderOverview(el) {
           <div class="flex" style="gap:10px;padding:3px 0;font-size:13px" data-tip="${esc(x.en)} · ${x.met}/5 · Strength ${Math.round(x.str * 100)}%">
             <span style="width:190px;flex:none;${x.code === prim.code ? 'font-weight:700' : 'color:var(--ink-2)'}">${x.en}</span>
             <div class="strength" style="flex:1"><i style="width:${(x.met + .99 * x.str) / 5.99 * 100}%;background:${x.fam === 'Risk-Off' ? 'var(--soff)' : 'var(--son)'};opacity:${x.code === prim.code ? 1 : .55}"></i></div>
-            <b class="num" style="width:30px;text-align:end">${x.met}/5</b></div>`).join('')}
+            <b class="num" style="width:30px;text-align:end">${x.na ? '—' : x.met + '/5'}</b></div>`).join('')}
       </div>
     </div>
     <div class="card c5">
@@ -527,7 +527,7 @@ function drawHeatCats(el) {
 function drawHeatTypes(el) {
   const t = T(), H = D.history, ch = mk(el);
   const i0 = H.types.findIndex(r => r), dates = H.dates.slice(i0), data = [];
-  H.types.slice(i0).forEach((r, i) => { if (r) D.types.forEach((tp, j) => data.push([i, j, r[j + 1]])); });
+  H.types.slice(i0).forEach((r, i) => { if (r) D.types.forEach((tp, j) => { if (r[j + 1] != null) data.push([i, j, r[j + 1]]); }); });
   const prim = H.types.slice(i0).map((r, i) => r ? [i, D.types.findIndex(x => x.code === r[0])] : null).filter(Boolean);
   const seq = t.dark ? ['#1f1f1e', '#184f95', '#3987e5', '#9ec5f4'] : ['#f5f5f1', '#9ec5f4', '#2a78d6', '#0d366b'];
   ch.setOption({
@@ -553,6 +553,10 @@ function downloadCSV() {
   a.download = `risk-regime-history-${D.meta.last}.csv`; a.click(); URL.revokeObjectURL(a.href);
 }
 
+// days in a row the raw signal sits below/above the confirmed regime, out of the days needed to move it
+const pendTxt = k => !k.pend ? L('منطبق با رژیم', 'matches the regime')
+  : L(`${N(Math.abs(k.pend))} از ${N(k.need)} روز ${k.pend < 0 ? 'پایین‌تر' : 'بالاتر'} از رژیم`, `${Math.abs(k.pend)} of ${k.need} days ${k.pend < 0 ? 'below' : 'above'} the regime`);
+
 /* ================= FX BOARD ================= */
 function renderFX(el) {
   const g = D.fxg, k = D.kpi, beta = g['High-beta G10'] - g['Haven'], emg = g['EM carry'] - g['Haven'];
@@ -571,13 +575,13 @@ function renderFX(el) {
       </div>
     </div>
     <div class="card c12 flush">
-      <div class="card-h" style="padding:20px 20px 0"><div><h3>${L('جدول عملکرد', 'Performance table')}</h3><div class="sub">${L('رنگ سلول: شدت حرکت · نمودار: ۳ ماه اخیر', 'Cell colour: size of the move · chart: last 3 months')}</div></div></div>
+      <div class="card-h" style="padding:20px 20px 0"><div><h3>${L('جدول عملکرد', 'Performance table')}</h3><div class="sub">${L(`رنگ سلول: شدت حرکت · نمودار: ۳ ماه اخیر · سازگاری با رژیم: بازده ${N(k.fit_n)} روز کاری اخیر (از شروع رژیم، حداقل ۵ و حداکثر ۲۱ روز)`, `Cell colour: size of the move · chart: last 3 months · regime fit: return over the last ${k.fit_n} business days (since the regime began, 5 to 21 days)`)}</div></div></div>
       <div class="tbl-wrap" style="padding:0 16px 12px"><table class="tbl"><thead><tr><th>${L('ارز', 'Currency')}</th><th class="r">1D</th><th class="r">1W</th><th class="r">1M</th><th class="r">3M</th><th class="r">YTD</th><th>3M trend</th><th>${L('انتظار در Risk-Off', 'Expected in Risk-Off')}</th><th>${L('سازگاری با رژیم', 'Regime fit')}</th></tr></thead><tbody>
       ${fx.map(r => `<tr>
         <td><div class="ccy"><span class="flag">${r.ccy}</span><div><b>${r.pair}</b>${r.est ? `<span class="est-tag" data-tip="${L('آخرین نرخ از ECB تخمین زده شده؛ با انتشار FRED جایگزین می‌شود', 'Latest rate estimated from the ECB; replaced when FRED publishes')}">ECB</span>` : ''}<div class="muted" style="font-size:11.5px">${GRP[r.grp]} · <span class="num">${r.last.toLocaleString('en-US', { maximumFractionDigits: 4 })}</span></div></div></div></td>
         ${['r1d', 'r1w', 'r1m', 'r3m', 'ytd'].map(c => `<td class="r num"><span class="heat" style="${heatBg(r[c], c === 'r1d' ? .01 : c === 'r1w' ? .02 : .06)}">${pc(r[c], 2)}</span></td>`).join('')}
         <td style="width:110px;min-width:110px">${spark(r.spark, { band: 0, lo: Math.min(...r.spark.filter(v => v != null), 0), hi: Math.max(...r.spark.filter(v => v != null), 0), h: 30, color: r.r3m >= 0 ? css('--son') : css('--soff') })}</td>
-        <td class="ink2">${exp[r.exp]}</td><td>${stIcon(...fit[r.fit])}</td></tr>`).join('')}
+        <td class="ink2">${exp[r.exp]}</td><td data-tip="${L(`بازده ${k.fit_n} روزه`, `${k.fit_n}-day return`)}: ${esc(pc(r.rfit, 2))}">${stIcon(...fit[r.fit])}</td></tr>`).join('')}
       </tbody></table></div>
     </div>
     <div class="card c6">
@@ -650,7 +654,7 @@ function renderPlaybook(el) {
   const fam = f => D.types.filter(x => x.fam === f).sort((a, b) => (b.met + b.str) - (a.met + a.str));
   const card = tp => `<div class="tcard ${tp.code === D.primary ? 'primary rc-' + REG[D.kpi.regime].k : ''}">
       <div class="row"><span class="type-code">${tp.code}${tp.code === D.primary ? ` · <b style="color:var(--rc-t)">${L('نوع اصلی امروز', "Today's primary type")}</b>` : tp.code === D.secondary ? ` · ${L('نوع دوم امروز', "Today's secondary type")}` : ''}</span>
-        <span class="flex"><span class="dots">${[0, 1, 2, 3, 4].map(i => `<i class="${i < tp.met ? 'on' : ''}"></i>`).join('')}</span><b class="num">${tp.met}/5</b></span></div>
+        <span class="flex"><span class="dots">${[0, 1, 2, 3, 4].map(i => `<i class="${i < tp.met ? 'on' : ''}"></i>`).join('')}</span><b class="num">${tp.na ? '—' : tp.met + '/5'}</b></span></div>
       <h3 class="en">${tp.en}</h3>
       <div><div class="flex" style="justify-content:space-between;font-size:12px" class="muted"><span class="muted">Strength</span><span class="num muted">${Math.round(tp.str * 100)}%</span></div>
         <div class="strength"><i style="width:${tp.str * 100}%"></i></div></div>
@@ -759,7 +763,12 @@ function renderLab(el) {
   el.addEventListener('input', e => {
     const k = e.target.dataset.k; if (!k) return;
     const v = +e.target.value; $(`[data-out="${k}"]`).textContent = Number.isInteger(v) ? v : f2(v);
-    if (k === 'span') p.span = v; else if (k === 'Kdn' || k === 'Kup') p[k] = v; else if (k.startsWith('thr')) p.thr[+k[3]] = v; else if (k.startsWith('cw_')) p.cw[k.slice(3)] = v;
+    if (k === 'span') p.span = v; else if (k === 'Kdn' || k === 'Kup') p[k] = v; else if (k.startsWith('thr')) {
+      const j = +k[3], lo = j < 3 ? p.thr[j + 1] + .05 : -Infinity, hi = j > 0 ? p.thr[j - 1] - .05 : Infinity;
+      const cv = +Math.min(Math.max(v, lo), hi).toFixed(2);
+      if (cv !== v) { e.target.value = cv; $(`[data-out="${k}"]`).textContent = f2(cv); }
+      p.thr[j] = cv;
+    } else if (k.startsWith('cw_')) p.cw[k.slice(3)] = v;
     upd();
   });
   el.addEventListener('click', e => {

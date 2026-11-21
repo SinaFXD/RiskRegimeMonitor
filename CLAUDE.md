@@ -38,7 +38,11 @@ Tail risk, High-beta, Spread, Defaults, Leveraged sectors, Private credit. Never
 ## Model (do not change semantics without updating reference2.py, export_site.py and the Model Lab in app.js)
 - Inputs = forward-filled series + derived (AUDJPY, EURCHF, EM FX basket MXN/BRL/ZAR/KRW, VIX/VIX3M, UST_RV).
 - Transforms: LEVEL, RET (20d log return), DD (vs 252d max), CP10 (10d avg of the CP-Tbill spread, bp; spread taken only
-  on days both rates exist, since DCPF3M is missing on ~half the days).
+  on days both rates exist, since DCPF3M is missing on ~half the days; then forward-filled — z needs a full 252-obs
+  window, so one unfilled gap used to blank CP z for a year).
+- Missing inputs: a regime type with a NaN input has no score that day (type history keeps the other types); alerts
+  treat None/NaN as "not firing". Regime stats hit rates drop the last NW days (future return not known yet).
+- FX Board "regime fit" uses the return since the regime began (fit_n = days in regime, clamped 5..21), not 1M.
 - z = (x - mean252)/stdev.s252, needs 252 obs, capped ±3, × direction → signed z (positive = risk-on).
 - Category = mean of available signed z; RAI = weighted mean of categories; EMA span 5; regime from thresholds
   (0.60 / 0.25 / −0.25 / −0.75); directional confirmation (2026-11-21): KDN=2 consecutive raw days below the confirmed

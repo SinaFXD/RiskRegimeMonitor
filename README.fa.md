@@ -105,7 +105,7 @@ z-score نسبت به ۲۵۲ روز گذشته سنجیده می‌شود، پس
 
 جدا از Guardrail، نمای کلی این موارد را هم بررسی می‌کند: معکوس شدن VIX term structure، تأیید نشدن رالی Equities
 توسط Credit، هشدار زودتر FX نسبت به Equities، USD funding stress، Breadth divergence، Safe haven نبودن JPY،
-Correlation spike، منفی شدن Stock–bond correlation، وخامت سریع، احتمال Bottoming، داده‌ی قدیمی و پوشش ناقص
+Correlation spike، مثبت شدن Stock–bond correlation، وخامت سریع، احتمال Bottoming، داده‌ی قدیمی و پوشش ناقص
 Categoryها.
 
 ## داده و به‌روزرسانی

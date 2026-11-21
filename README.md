@@ -102,7 +102,7 @@ regime itself.
 
 Besides the guardrail, the overview checks for an inverted VIX term structure, Credit not confirming an equity
 rally, FX warning ahead of equities, USD funding stress, breadth divergence, JPY not acting as a safe haven,
-correlation spikes, a negative stock–bond correlation, rapid deterioration, possible bottoming, stale data and
+correlation spikes, a positive stock–bond correlation, rapid deterioration, possible bottoming, stale data and
 incomplete category coverage.
 
 ## Data and updates
