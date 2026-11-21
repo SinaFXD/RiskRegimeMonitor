@@ -36,7 +36,7 @@ Tail risk, High-beta, Spread, Defaults, Leveraged sectors, Private credit. Never
   (python -m http.server 8765 --directory site).
 
 ## Model (do not change semantics without updating reference2.py, export_site.py and the Model Lab in app.js)
-- Inputs = forward-filled series + derived (AUDJPY, EURCHF, EM FX basket MXN/BRL/ZAR/KRW, VIX/VIX3M, UST_RV).
+- Inputs = forward-filled series + derived (AUDJPY, EURCHF, EM FX basket MXN/BRL/ZAR/KRW (equal-weight geometric), VIX/VIX3M, UST_RV).
 - Transforms: LEVEL, RET (20d log return), DD (vs 252d max), CP10 (10d avg of the CP-Tbill spread, bp; spread taken only
   on days both rates exist, since DCPF3M is missing on ~half the days; then forward-filled — z needs a full 252-obs
   window, so one unfilled gap used to blank CP z for a year).

@@ -22,7 +22,8 @@ def reference(span=5, kdn=2, kup=3, thr=(0.60, 0.25, -0.25, -0.75)):
     legs = ['USDMXN', 'USDBRL', 'USDZAR', 'USDKRW']
     base = df[legs].iloc[0]
     allp = df[legs].notna().all(axis=1)
-    c['EMFX'] = (100 * (base / df[legs]).mean(axis=1)).where(allp).ffill()
+    # geometric mean, so a leg that weakens keeps its 1/4 weight (an arithmetic mean of relatives lets it shrink)
+    c['EMFX'] = (100 * np.exp(np.log(base / df[legs]).mean(axis=1))).where(allp).ffill()
     c['VIX_RATIO'] = c['VIX'] / c['VIX3M']
     # MOVE proxy: realized vol of daily 10Y yield changes over NW days, annualised, in bp
     ty = df['UST10Y'].dropna()

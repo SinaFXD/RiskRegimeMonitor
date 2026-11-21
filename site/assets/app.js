@@ -306,7 +306,7 @@ function renderOverview(el) {
       <div style="margin-top:18px;padding-top:14px;border-top:1px dashed var(--border-2)">
         <div class="muted" style="font-size:12.5px;margin-bottom:8px">${L('رتبه‌بندی همه الگوها امروز', "Today's ranking of all patterns")}</div>
         ${[...D.types].sort((a, b) => (b.met + .99 * b.str) - (a.met + .99 * a.str)).map(x => `
-          <div class="flex" style="gap:10px;padding:3px 0;font-size:13px" data-tip="${esc(x.en)} · ${x.met}/5 · Strength ${Math.round(x.str * 100)}%">
+          <div class="flex" style="gap:10px;padding:3px 0;font-size:13px" data-tip="${esc(x.en)} · ${x.na ? L('داده‌ی کافی نیست', 'not enough data') : `${x.met}/5 · Strength ${Math.round(x.str * 100)}%`}">
             <span style="width:190px;flex:none;${x.code === prim.code ? 'font-weight:700' : 'color:var(--ink-2)'}">${x.en}</span>
             <div class="strength" style="flex:1"><i style="width:${(x.met + .99 * x.str) / 5.99 * 100}%;background:${x.fam === 'Risk-Off' ? 'var(--soff)' : 'var(--son)'};opacity:${x.code === prim.code ? 1 : .55}"></i></div>
             <b class="num" style="width:30px;text-align:end">${x.na ? '—' : x.met + '/5'}</b></div>`).join('')}

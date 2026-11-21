@@ -192,7 +192,7 @@ def main():
          kpi['guard']['conflict'], reg,
          ('VIX یا HY OAS بالای آستانه و رژیم Neutral یا بهتر', 'VIX or HY OAS above its level and the regime Neutral or better')),
         (('Guardrail: VIX در سطح مطلق استرس', 'Guardrail: VIX at an absolute stress level'),
-         g_vix, f"{vix:.1f}", f"≥ {GUARD['VIX']:.0f}"),
+         g_vix, f"{vix:.1f}" if ok(vix) else '—', f"≥ {GUARD['VIX']:.0f}"),
         (('Guardrail: HY OAS در سطح مطلق استرس', 'Guardrail: HY OAS at an absolute stress level'),
          g_hy, ('بالای آستانه', 'above') if g_hy else ('زیر آستانه', 'below'), f"≥ {GUARD['HY']:.0f}%"),   # ICE: no level shown
         (('VIX term structure معکوس شده (VIX > VIX3M) — استرس حاد', 'VIX term structure inverted (VIX > VIX3M) — acute stress'),
