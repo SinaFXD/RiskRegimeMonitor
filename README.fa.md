@@ -31,7 +31,7 @@
 
 ```
 FRED + ECB data ─► transform ─► rolling z-score (252d, capped ±3, signed) ─► 5 category scores
-   ─► RAI (weighted mean) ─► 5-day EMA ─► regime label ─► confirmed after 3 days in a row
+   ─► RAI (weighted mean) ─► 5-day EMA ─► regime label ─► confirmed (2 days down, 3 days up)
    ─► regime type (11 patterns × 5 conditions) ─► playbook, alerts, FX Board
 ```
 
@@ -43,8 +43,8 @@ FRED + ECB data ─► transform ─► rolling z-score (252d, capped ±3, signe
    عدد مثبت همیشه یعنی «خوب برای ریسک».
 3. **تجمیع:** Score هر Category میانگین Signed z شاخص‌های در دسترس آن است. RAI میانگین وزنی Categoryهاست و اگر
    داده‌ای نباشد، وزن‌ها دوباره نرمال می‌شوند.
-4. **برچسب:** EMA پنج روزه‌ی RAI با آستانه‌های ثابت مقایسه می‌شود. رژیم فقط وقتی عوض می‌شود که برچسب جدید ۳ روز
-   پشت سر هم تکرار شود (Confirmation).
+4. **برچسب:** EMA پنج روزه‌ی RAI با آستانه‌های ثابت مقایسه می‌شود. Confirmation جهت‌دار است: اگر برچسب خام ۲ روز
+   پشت سر هم پایین‌تر از رژیم فعلی باشد، رژیم به ملایم‌ترین برچسب همان روزها پایین می‌آید؛ برای بالا رفتن ۳ روز لازم است.
 5. **توضیح:** ۱۱ Regime type هر کدام با ۵ شرط سنجیده می‌شوند (z-score تغییرات ۲۰ روزه‌ی Yieldها، Breakeven،
    Real yield، نفت، USDJPY و USD، به‌علاوه‌ی Score Categoryها و Correlationها). نوع اصلی از میان الگوهای
    هم‌خانواده با رژیم فعلی انتخاب می‌شود.

@@ -37,12 +37,16 @@ Tail risk, High-beta, Spread, Defaults, Leveraged sectors, Private credit. Never
 
 ## Model (do not change semantics without updating reference2.py, export_site.py and the Model Lab in app.js)
 - Inputs = forward-filled series + derived (AUDJPY, EURCHF, EM FX basket MXN/BRL/ZAR/KRW, VIX/VIX3M, UST_RV).
-- Transforms: LEVEL, RET (20d log return), DD (vs 252d max), CP10 (10d avg CP-Tbill spread, bp).
+- Transforms: LEVEL, RET (20d log return), DD (vs 252d max), CP10 (10d avg of the CP-Tbill spread, bp; spread taken only
+  on days both rates exist, since DCPF3M is missing on ~half the days).
 - z = (x - mean252)/stdev.s252, needs 252 obs, capped ±3, × direction → signed z (positive = risk-on).
 - Category = mean of available signed z; RAI = weighted mean of categories; EMA span 5; regime from thresholds
-  (0.60 / 0.25 / −0.25 / −0.75); confirmed after K=3 consecutive days.
+  (0.60 / 0.25 / −0.25 / −0.75); directional confirmation (2026-11-21): KDN=2 consecutive raw days below the confirmed
+  regime move it down to the mildest of them, KUP=3 days above move it up (Model Lab mirrors this and asserts the
+  confirmed regime matches after the EMA warm-up).
 - 11 regime "types" (5 conditions each on 20d-change z of 10Y, 2Y, breakeven, real yield, WTI, USDJPY, USD,
-  categories, correlations); primary type chosen within the regime family.
+  categories, correlations); primary type chosen within the regime family. SBC = 60d corr(SPX return, −Δ10Y yield), i.e.
+  the market (bond price) convention: positive = Treasuries not hedging equities.
 - Guardrail: VIX ≥ 30 or HY OAS ≥ 5% → alerts + overview banner (red when the regime is Neutral or better).
   Alert only; does not change the regime. Reason: z is relative to 252 days, so a long crisis drifts toward 0.
 - Volatility includes `USTRV` (2026-11-21), a MOVE proxy: 20-day realized vol of daily DGS10 changes, annualised bp

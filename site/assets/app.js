@@ -673,13 +673,13 @@ function renderPlaybook(el) {
 }
 
 /* ================= MODEL LAB ================= */
-const LAB0 = () => ({ span: D.meta.span, K: D.meta.k, thr: [D.meta.thr.TSON, D.meta.thr.TON, D.meta.thr.TOFF, D.meta.thr.TSOFF],
+const LAB0 = () => ({ span: D.meta.span, Kdn: D.meta.kdn, Kup: D.meta.kup, thr: [D.meta.thr.TSON, D.meta.thr.TON, D.meta.thr.TOFF, D.meta.thr.TSOFF],
   cw: Object.fromEntries(D.cats.map(c => [c.code, c.w])), en: Object.fromEntries(D.indicators_def.map(i => [i.id, true])) });
 let LAB = null;
 function computeModel(p) {
   const H = D.history, n = H.dates.length, defs = D.indicators_def;
   const rai = new Array(n).fill(null), ema = new Array(n).fill(null), raw = new Array(n).fill(null), conf = new Array(n).fill(null);
-  const a = 2 / (p.span + 1); let prev = null, streak = 0, prc = null;
+  const a = 2 / (p.span + 1); let prev = null, prc = null;
   const lab = e => e >= p.thr[0] ? 2 : e >= p.thr[1] ? 1 : e > p.thr[2] ? 0 : e > p.thr[3] ? -1 : -2;
   for (let i = 0; i < n; i++) {
     let num = 0, den = 0;
@@ -693,8 +693,13 @@ function computeModel(p) {
     rai[i] = num / den;
     prev = prev == null ? rai[i] : prev + a * (rai[i] - prev); ema[i] = prev;
     raw[i] = lab(prev);
-    streak = i > 0 && raw[i - 1] === raw[i] ? streak + 1 : 1;
-    prc = (streak >= p.K || prc == null) ? raw[i] : prc; conf[i] = prc;
+    // directional confirmation (same as reference2.py): Kdn days below the regime move it down, Kup days above move it up
+    const win = k => { if (i < k - 1) return null; const w = raw.slice(i - k + 1, i + 1); return w.some(v => v == null) ? null : w; };
+    const dn = win(p.Kdn), up = win(p.Kup);
+    if (prc == null) prc = raw[i];
+    else if (dn && Math.max(...dn) < prc) prc = Math.max(...dn);
+    else if (up && Math.min(...up) > prc) prc = Math.min(...up);
+    conf[i] = prc;
   }
   return { rai, ema, raw, conf };
 }
@@ -708,7 +713,7 @@ function renderLab(el) {
     <div class="card c4">
       <div class="lab-ctl">
         <div class="ctl-grid">
-          ${ctl('span', L('EMA span (روز)', 'EMA span (days)'), p.span, 1, 30, 1)}${ctl('K', 'Confirmation days', p.K, 1, 10, 1)}
+          ${ctl('span', L('EMA span (روز)', 'EMA span (days)'), p.span, 1, 30, 1)}${ctl('Kdn', L('Confirmation days ↓ (سمت Risk-Off)', 'Confirmation days ↓ (toward Risk-Off)'), p.Kdn, 1, 10, 1)}${ctl('Kup', L('Confirmation days ↑ (سمت Risk-On)', 'Confirmation days ↑ (toward Risk-On)'), p.Kup, 1, 10, 1)}
         </div>
         <div><div class="muted" style="font-size:12.5px;margin-bottom:8px">${L('آستانه‌های رژیم روی RAI (EMA)', 'Regime thresholds on RAI (EMA)')}</div><div class="ctl-grid">
           ${ctl('thr0', 'Strong Risk-On ≥', p.thr[0], 0, 2, .05)}${ctl('thr1', 'Risk-On ≥', p.thr[1], 0, 1.5, .05)}
@@ -754,7 +759,7 @@ function renderLab(el) {
   el.addEventListener('input', e => {
     const k = e.target.dataset.k; if (!k) return;
     const v = +e.target.value; $(`[data-out="${k}"]`).textContent = Number.isInteger(v) ? v : f2(v);
-    if (k === 'span') p.span = v; else if (k === 'K') p.K = v; else if (k.startsWith('thr')) p.thr[+k[3]] = v; else if (k.startsWith('cw_')) p.cw[k.slice(3)] = v;
+    if (k === 'span') p.span = v; else if (k === 'Kdn' || k === 'Kup') p[k] = v; else if (k.startsWith('thr')) p.thr[+k[3]] = v; else if (k.startsWith('cw_')) p.cw[k.slice(3)] = v;
     upd();
   });
   el.addEventListener('click', e => {
@@ -765,6 +770,10 @@ function renderLab(el) {
   // the browser re-implementation must reproduce the exported model
   const n = D.history.dates.length - 1;
   console.assert(Math.abs(base.ema[n] - D.history.ema[n]) < 1e-3, 'lab model mismatch', base.ema[n], D.history.ema[n]);
+  // regimes must match once the EMA has warmed up (the exported history starts after the model's first EMA)
+  let w = 0; D.history.ema.forEach((e, i) => { if (e != null && Math.abs(e - base.ema[i]) >= 1e-3) w = i + 1; });
+  const bad = D.history.reg.findIndex((r, i) => i >= w && r != null && r !== base.conf[i]);
+  console.assert(bad < 0, 'lab regime mismatch', D.history.dates[bad], base.conf[bad], D.history.reg[bad]);
 }
 const ctl = (k, l, v, min, max, step) => `<div class="ctl"><label><span>${l}</span><b data-out="${k}">${Number.isInteger(v) ? v : f2(v)}</b></label><input type="range" data-k="${k}" min="${min}" max="${max}" step="${step}" value="${v}"></div>`;
 
@@ -824,7 +833,7 @@ const GLOSSARY = () => [
   [L('ECB (برچسب زرد)', 'ECB (yellow tag)'), L('FRED نرخ ارزها را هفته‌ای یک بار منتشر می‌کند. برای روزهای بین، از نرخ‌های بانک مرکزی اروپا (ECB) تخمین می‌زنیم و بعداً عدد رسمی جایش می‌نشیند.', 'FRED publishes FX rates once a week. For the days in between we estimate from European Central Bank (ECB) rates, and the official number replaces it later.')],
 ];
 function renderGuide(el) {
-  const k = D.kpi, g = REG[k.regime], thr = D.meta.thr, K = D.meta.k, wx = WX(), cs = CAT_SIMPLE();
+  const k = D.kpi, g = REG[k.regime], thr = D.meta.thr, KD = D.meta.kdn, KU = D.meta.kup, wx = WX(), cs = CAT_SIMPLE();
   const prim = D.types.find(x => x.code === D.primary), sec = D.types.find(x => x.code === D.secondary);
   const rp = D.regimes.find(r => r.reg === k.regime) || {}, onA = D.alerts.filter(a => a.on);
   const budget = Math.round((rp.budget || 0) * 100), to = L('تا', 'to');
@@ -912,7 +921,7 @@ function renderGuide(el) {
       ${step(2, L('مقایسه با یک سال گذشته', 'Comparing with the past year'), L('<p>هر عدد با یک سال گذشته‌ی خودش مقایسه می‌شود (z-score). سؤال این است: «امروز عادی است یا غیرعادی؟» مثلاً VIX = 20 در یک سال آرام زیاد است، ولی در یک سال پرتنش عادی.</p>', '<p>Each number is compared with its own past year (z-score). The question is: "Is today normal or unusual?" For example, VIX = 20 is high after a calm year but normal after a turbulent one.</p>'))}
       ${step(3, L('نمره‌ی هر درس', 'A grade per subject'), L('<p>عددها در ۵ گروه (Category) جمع می‌شوند و هر گروه یک نمره می‌گیرد؛ مثل نمره‌ی ۵ درس.</p>', '<p>The numbers are grouped into 5 categories and each category gets a score — like grades in 5 subjects.</p>'))}
       ${step(4, L('معدل', 'The average'), L('<p>میانگین این ۵ نمره می‌شود <b>RAI</b>. بعد با EMA کمی نرم می‌شود تا یک روز عجیب همه‌چیز را به هم نریزد.</p>', "<p>The average of these 5 scores is the <b>RAI</b>. It is then smoothed a little with an EMA so one odd day doesn't upset everything.</p>"))}
-      ${step(5, L('برچسب زدن', 'Labelling'), L(`<p>RAI با خط‌کش مقایسه می‌شود (بخش «۵ حالت بازار» را ببین) و رژیم مشخص می‌شود. ولی رژیم فقط وقتی عوض می‌شود که حالت جدید <b>${N(K)} روز پشت سر هم</b> تکرار شود؛ با یک روز باران نمی‌گوییم زمستان شده.</p>`, `<p>The RAI is compared with a ruler (see "The 5 market states") to set the regime. But the regime only changes when the new state repeats <b>${N(K)} days in a row</b> — one rainy day doesn't make it winter.</p>`))}
+      ${step(5, L('برچسب زدن', 'Labelling'), L(`<p>RAI با خط‌کش مقایسه می‌شود (بخش «۵ حالت بازار» را ببین) و رژیم مشخص می‌شود. ولی رژیم فوراً عوض نمی‌شود: برای رفتن به سمت Risk-Off باید حالت بدتر <b>${N(KD)} روز پشت سر هم</b> دیده شود و برای برگشت به سمت Risk-On <b>${N(KU)} روز</b>؛ با یک روز باران نمی‌گوییم زمستان شده. ترس سریع می‌آید و اعتماد آهسته برمی‌گردد، برای همین برگشت یک روز صبر بیشتری می‌خواهد.</p>`, `<p>The RAI is compared with a ruler (see "The 5 market states") to set the regime. But the regime doesn't flip at once: moving toward Risk-Off needs a worse state for <b>${N(KD)} days in a row</b>, and moving back toward Risk-On needs <b>${N(KU)} days</b> — one rainy day doesn't make it winter. Fear arrives fast and confidence returns slowly, so the way back asks for a little more patience.</p>`))}
       ${step(6, L('پیدا کردن دلیل', 'Finding the reason'), L('<p>۱۱ الگو بررسی می‌شوند. هر الگو ۵ سؤال بله/خیر دارد (مثلاً «آیا JPY قوی شده؟»). الگویی که بیشترین «بله» را بگیرد، نوع اصلی رژیم است.</p>', '<p>11 patterns are checked. Each has 5 yes/no questions (e.g. "Has JPY strengthened?"). The pattern with the most "yes" answers is the primary regime type.</p>'))}
     </div>
     <div class="card c5">
@@ -933,7 +942,7 @@ function renderGuide(el) {
   ${head('faq', L('سؤال‌های رایج', 'Frequently asked questions'))}
   <div class="card fade-in g-faq">${[
     [L('سایت کی به‌روز می‌شود؟', 'When does the site update?'), L('هر روز کاری، خودکار و دو بار: حدود ساعت ۰۲:۰۰ و ۱۷:۳۰ به وقت تهران. تاریخ آخرین داده بالای صفحه نوشته شده.', 'Automatically, twice every business day: around 22:30 and 14:00 UTC. The latest data date is shown at the top of the page.')],
-    [L('RAI از خط رد شد ولی رژیم عوض نشد. چرا؟', "RAI crossed a line but the regime didn't change. Why?"), L(`به‌خاطر قانون صبر (Confirmation): حالت جدید باید ${K} روز پشت سر هم تکرار شود. تا آن موقع، Raw signal را زیر اسم رژیم ببین.`, `Because of the patience rule (Confirmation): the new state must repeat ${K} days in a row. Until then, check the Raw signal under the regime name.`)],
+    [L('RAI از خط رد شد ولی رژیم عوض نشد. چرا؟', "RAI crossed a line but the regime didn't change. Why?"), L(`به‌خاطر قانون صبر (Confirmation): برای رفتن به سمت Risk-Off حالت بدتر باید ${KD} روز پشت سر هم دیده شود و برای برگشت به سمت Risk-On ${KU} روز. تا آن موقع، Raw signal را زیر اسم رژیم ببین.`, `Because of the patience rule (Confirmation): moving toward Risk-Off needs a worse state ${KD} days in a row, and moving back toward Risk-On needs ${KU} days. Until then, check the Raw signal under the regime name.`)],
     [L('برچسب زرد ECB یعنی چه؟', 'What does the yellow ECB tag mean?'), L('FRED نرخ ارزها را هفته‌ای یک بار منتشر می‌کند. برای روزهای بین، نرخ را از بانک مرکزی اروپا (ECB) تخمین می‌زنیم. خطای این تخمین معمولاً کمتر از نیم درصد است و بعداً عدد رسمی جایش می‌نشیند.', 'FRED publishes FX rates once a week. For the days in between we estimate the rate from the European Central Bank (ECB). The estimate is usually within half a percent, and the official number replaces it later.')],
     [L('هشدارها با رژیم جور درنمی‌آیند. یعنی چه؟', "The alerts don't match the regime. What does that mean?"), L('یعنی احتمال تغییر وجود دارد. مثلاً رژیم Risk-On است ولی هشدار «Credit رالی Equities را تأیید نمی‌کند» فعال شده؛ پس با احتیاط بیشتر جلو برو.', 'It means a change may be coming. For example, the regime is Risk-On but the "Credit is not confirming the equity rally" alert is active — so proceed with more caution.')],
     [L('چرا Spreadهای HY و IG عدد خام ندارند؟', "Why don't the HY and IG spreads show raw numbers?"), L('طبق شرایط استفاده از داده‌های ICE BofA در FRED، فقط z-score آن‌ها را نشان می‌دهیم.', "Under the terms of use for ICE BofA data on FRED, we only show their z-scores.")],
@@ -950,18 +959,18 @@ function renderGuide(el) {
   ${head('pro', L('برای حرفه‌ای‌ها: جزئیات فنی', 'For pros: technical details'), L('اگر تازه‌کاری، این بخش را لازم نداری.', "If you're new, you can skip this section."))}
   <details class="card fade-in g-pro"><summary>${L('نمایش جزئیات فنی و فهرست داده‌ها', 'Show technical details and the data list')}</summary>
     <div class="grid" style="margin-top:14px"><div class="c8 prose">${L(`
-      <p><b>Transformها:</b> LEVEL = خود سطح (Volatility و Spreadها)؛ RET = Log return ${D.meta.nw} روزه؛ DD = Drawdown از سقف ${D.meta.lb} روزه؛ CP10 = میانگین ۱۰ روزه CP – T-bill spread. UST 10Y Realized Vol = انحراف معیار تغییرات روزانه‌ی بازده ۱۰ ساله در ${D.meta.nw} روز، سالانه‌شده و بر حسب bp (Proxy برای MOVE).</p>
+      <p><b>Transformها:</b> LEVEL = خود سطح (Volatility و Spreadها)؛ RET = Log return ${D.meta.nw} روزه؛ DD = Drawdown از سقف ${D.meta.lb} روزه؛ CP10 = میانگین ۱۰ روزه CP – T-bill spread (فقط روزهایی که هر دو نرخ منتشر شده‌اند). UST 10Y Realized Vol = انحراف معیار تغییرات روزانه‌ی بازده ۱۰ ساله در ${D.meta.nw} روز، سالانه‌شده و بر حسب bp (Proxy برای MOVE).</p>
       <p><b>Rolling z-score:</b> z = (x − Mean ${D.meta.lb} روز) ÷ Std dev ${D.meta.lb} روز، Capped در ±${D.meta.cap}، ضربدر جهت شاخص (Signed z).</p>
       <p><b>Categoryها و RAI:</b> Score هر Category میانگین Signed z شاخص‌های در دسترس است؛ RAI میانگین وزنی Categoryهاست و اگر داده‌ای نباشد وزن‌ها دوباره نرمال می‌شوند.</p>
-      <p><b>Smoothing و Confirmation:</b> EMA ${D.meta.span} روزه؛ رژیم پس از ${K} روز پیاپی برچسب جدید عوض می‌شود. آستانه‌ها: ${N(range.SON)}، ${N(range.ON)}، ${N(range.NEU)}، ${N(range.OFF)}، ${N(range.SOFF)}.</p>
+      <p><b>Smoothing و Confirmation:</b> EMA ${D.meta.span} روزه؛ Confirmation جهت‌دار است: اگر برچسب خام ${KD} روز پیاپی پایین‌تر از رژیم فعلی باشد، رژیم به ملایم‌ترین برچسب همان روزها پایین می‌آید؛ برای بالا رفتن ${KU} روز پیاپی بالاتر لازم است. پس نوسان بین Risk-Off و Strong Risk-Off رژیم را قفل نمی‌کند. آستانه‌ها: ${N(range.SON)}، ${N(range.ON)}، ${N(range.NEU)}، ${N(range.OFF)}، ${N(range.SOFF)}.</p>
       <p><b>Regime type:</b> 5 شرط روی z-score تغییرات ${D.meta.nw} روزه (Yields، Breakeven، Real yield، WTI، USDJPY، USD)، Category scoreها و Correlationها. هر شرط یک Margin بین −1 و +1 دارد؛ Strength = میانگین Marginها. نوع اصلی از میان الگوهای هم‌خانواده با رژیم فعلی انتخاب می‌شود.</p>
       <p><b>داده:</b> FRED، و برای روزهای بعد از آخرین انتشار هفتگی H.10، ECB reference rates (با زنجیر کردن تغییرات روزانه روی آخرین عدد FRED). FRED فقط ۳ سال اخیر Spreadهای ICE را منتشر می‌کند، پس Category Credit از حدود نوامبر 2024 (پس از ${D.meta.lb} مشاهده) z دارد. StL Fed FSI و Chicago NFCI فقط برای مقایسه نمایش داده می‌شوند و در RAI نیستند.</p>
       <p><b>Guardrail:</b> مستقل از z-score، اگر VIX ≥ ${D.meta.guard.VIX} یا HY OAS ≥ ${D.meta.guard.HY}% باشد Alert فعال می‌شود؛ اگر همزمان رژیم Neutral یا بهتر باشد، Overview هشدار می‌دهد که رژیم ممکن است استرس را کم نشان دهد. منطق رژیم را تغییر نمی‌دهد.</p>
       <p><b>محدودیت‌ها:</b> z-score نسبی است؛ پس از یک سال آرام، افزایش معمولی هم «استرس» دیده می‌شود. Guardrail بخشی از این ضعف را پوشش می‌دهد. Proxy نوسان Bonds از نوع Realized است و کمی دیرتر از MOVE واکنش نشان می‌دهد. شاخص رژیم را نشان می‌دهد نه Entry point؛ آن را با Positioning، Valuation و Catalystها ترکیب کن.</p>`, `
-      <p><b>Transforms:</b> LEVEL = the level itself (volatility and spreads); RET = ${D.meta.nw}-day log return; DD = drawdown from the ${D.meta.lb}-day high; CP10 = 10-day average of the CP – T-bill spread. UST 10Y Realized Vol = standard deviation of daily 10-year yield changes over ${D.meta.nw} days, annualised, in bp (a MOVE proxy).</p>
+      <p><b>Transforms:</b> LEVEL = the level itself (volatility and spreads); RET = ${D.meta.nw}-day log return; DD = drawdown from the ${D.meta.lb}-day high; CP10 = 10-day average of the CP – T-bill spread (only on days both rates are published). UST 10Y Realized Vol = standard deviation of daily 10-year yield changes over ${D.meta.nw} days, annualised, in bp (a MOVE proxy).</p>
       <p><b>Rolling z-score:</b> z = (x − ${D.meta.lb}-day mean) ÷ ${D.meta.lb}-day std dev, capped at ±${D.meta.cap}, multiplied by the indicator's direction (signed z).</p>
       <p><b>Categories and RAI:</b> each category score is the mean signed z of its available indicators; RAI is the weighted mean of the categories, with weights re-normalised when data is missing.</p>
-      <p><b>Smoothing and confirmation:</b> ${D.meta.span}-day EMA; the regime changes after ${K} consecutive days with a new label. Thresholds: ${N(range.SON)}, ${N(range.ON)}, ${N(range.NEU)}, ${N(range.OFF)}, ${N(range.SOFF)}.</p>
+      <p><b>Smoothing and confirmation:</b> ${D.meta.span}-day EMA; confirmation is directional: if the raw label sits below the current regime for ${KD} consecutive days, the regime moves down to the mildest of those labels; moving up needs ${KU} consecutive days above. So swinging between Risk-Off and Strong Risk-Off cannot lock the regime. Thresholds: ${N(range.SON)}, ${N(range.ON)}, ${N(range.NEU)}, ${N(range.OFF)}, ${N(range.SOFF)}.</p>
       <p><b>Regime type:</b> 5 conditions on the z-score of ${D.meta.nw}-day changes (yields, breakeven, real yield, WTI, USDJPY, USD), category scores and correlations. Each condition has a margin between −1 and +1; Strength = mean of the margins. The primary type is chosen among patterns in the same family as the current regime.</p>
       <p><b>Data:</b> FRED, plus ECB reference rates for the days after the latest weekly H.10 release (chaining daily changes onto FRED's last value). FRED only publishes the last 3 years of ICE spreads, so the Credit category has z-scores from about November 2024 (after ${D.meta.lb} observations). The St. Louis Fed FSI and Chicago NFCI are shown for comparison only and are not part of the RAI.</p>
       <p><b>Guardrail:</b> independent of the z-scores, an alert fires when VIX ≥ ${D.meta.guard.VIX} or HY OAS ≥ ${D.meta.guard.HY}%; if the regime is Neutral or better at the same time, the overview warns that the regime may be understating stress. It does not change the regime logic.</p>

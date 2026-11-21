@@ -14,7 +14,7 @@ from reference2 import reference, diag_latest, type_scores
 warnings.filterwarnings('ignore', message='.*dayofweek')
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'site', 'data', 'latest.json')
 THR = dict(TSON=0.60, TON=0.25, TOFF=-0.25, TSOFF=-0.75)
-SPAN, K, STALE = 5, 3, 5
+SPAN, KDN, KUP, STALE = 5, 2, 3, 5
 HIST_START = '2023-11-01'        # first date with a valid RAI (252 obs after START)
 ICE = {'HY', 'IG', 'EMC'}         # ICE BofA OAS indicators (FRED terms: no reproduction of the data)
 
@@ -60,7 +60,7 @@ def diag_history(df, c, Z, out):
     D['CPZ'] = Z['CP'] * dirs['CP']
     m = df['SPX'].notna() & df['UST10Y'].notna()
     sp, ty = df.loc[m, 'SPX'], df.loc[m, 'UST10Y']
-    D['SBC'] = np.log(sp / sp.shift(1)).rolling(60).corr(ty.diff()).reindex(df.index).ffill()
+    D['SBC'] = np.log(sp / sp.shift(1)).rolling(60).corr(-ty.diff()).reindex(df.index).ffill()
     r = pd.DataFrame({'sp': np.log(c['SPX'] / c['SPX'].shift(1)), 'aj': np.log(c['AUDJPY'] / c['AUDJPY'].shift(1)),
                       'em': np.log(c['EMFX'] / c['EMFX'].shift(1)), 'hy': -c['HY_OAS'].diff()})
     pairs = [('sp', 'aj'), ('sp', 'em'), ('aj', 'em'), ('sp', 'hy'), ('aj', 'hy'), ('em', 'hy')]
@@ -86,7 +86,7 @@ def pick_types(scores, reg):
 
 
 def main():
-    df, c, X, Z, out = reference(span=SPAN, K=K, thr=tuple(THR.values()))
+    df, c, X, Z, out = reference(span=SPAN, kdn=KDN, kup=KUP, thr=tuple(THR.values()))
     last = out.index[-1]
     LD = df.index[-1]
     D_hist = diag_history(df, c, Z, out)
@@ -197,8 +197,8 @@ def main():
          ro and V['JPY'] > 0.25, f"{V['JPY']:.2f}", ('Risk-Off و USDJPY z > 0.25', 'Risk-Off and USDJPY z > 0.25')),
         (('Correlation spike (حرکت گله‌ای Macro)', 'Correlation spike (macro herding)'),
          V['AVGC'] > 0.5, f"{V['AVGC']:.2f}", '> 0.50'),
-        (('Treasuries دیگر Hedge سهام نیستند (Stock–bond correlation منفی)', 'Treasuries no longer hedge equities (negative stock–bond correlation)'),
-         V['SBC'] < -0.2, f"{V['SBC']:.2f}", '< −0.20'),
+        (('Treasuries دیگر Hedge سهام نیستند (Stock–bond correlation مثبت)', 'Treasuries no longer hedge equities (positive stock–bond correlation)'),
+         V['SBC'] > 0.2, f"{V['SBC']:+.2f}", '> +0.20'),
         (('وخامت سریع (افت ۵ روزه RAI)', 'Rapid deterioration (5-day RAI drop)'),
          kpi['d5'] < -0.5, f"{kpi['d5']:+.2f}", 'Δ5 < −0.50'),
         (('احتمال Bottoming (بهبود در دل استرس)', 'Possible bottoming (improvement under stress)'),
@@ -234,7 +234,7 @@ def main():
         ('HY', 'HY spread (signed z)', None, '', ('منفی = Spread widening', 'Negative = spread widening')),
         ('IG', 'IG spread (signed z)', None, '', ''),
         ('CPZ', 'CP – T-bill spread (raw z)', num(X['CP'].iloc[-1], 1), 'bpl', ('مثبت = Funding stress', 'Positive = funding stress')),
-        ('SBC', 'Stock–bond correlation (60d)', None, '', ('منفی = Treasuries دیگر Hedge سهام نیستند', 'Negative = Treasuries no longer hedge equities')),
+        ('SBC', 'Stock–bond correlation (60d)', None, '', ('بر اساس قیمت اوراق؛ مثبت = Treasuries دیگر Hedge سهام نیستند', 'Bond price, not yield; positive = Treasuries no longer hedge equities')),
         ('AVGC', 'Avg risk-asset correlation (40d)', None, '', 'S&P 500, AUDJPY, EM FX, HY spread'),
         ('VIXR', 'VIX ÷ VIX3M', num(c['VIX'].iloc[-1], 2), 'vix', ('> 1 یعنی Inverted term structure', '> 1 means an inverted term structure')),
     ]
@@ -306,7 +306,7 @@ def main():
 
     data = dict(
         meta=dict(updated=pd.Timestamp.now(tz='UTC').strftime('%Y-%m-%d %H:%M UTC'), last=str(LD.date()),
-                  lb=LB, nw=NW, cap=CAPV, span=SPAN, k=K, thr=THR, stale=STALE, guard=GUARD,
+                  lb=LB, nw=NW, cap=CAPV, span=SPAN, kdn=KDN, kup=KUP, thr=THR, stale=STALE, guard=GUARD,
                   ecb_from=str(min(fills.values()).date()) if fills else None),
         kpi=kpi, regimes=[dict(reg=l, fa=f, budget=b, post=p, post_en=REGIMES_POST_EN[l]) for l, f, b, p in REGIMES],
         cats=cats, inds=inds, types=types, primary=prim, secondary=sec, alerts=alerts, diag=diag, weekly=weekly,

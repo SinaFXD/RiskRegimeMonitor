@@ -5,7 +5,11 @@ from spec import *
 def ffill_where(s):
     return s.ffill()
 
-def reference(span=5, K=3, thr=(0.60, 0.25, -0.25, -0.75)):
+ORD = {'Strong Risk-Off': -2, 'Risk-Off': -1, 'Neutral': 0, 'Risk-On': 1, 'Strong Risk-On': 2}
+LBL = {v: k for k, v in ORD.items()}
+
+
+def reference(span=5, kdn=2, kup=3, thr=(0.60, 0.25, -0.25, -0.75)):
     df = load_data()
     n = len(df)
     c = pd.DataFrame(index=df.index)
@@ -32,8 +36,8 @@ def reference(span=5, K=3, thr=(0.60, 0.25, -0.25, -0.75)):
             ok = v.shift(LB - 1).notna()
             x = (v / v.rolling(LB, min_periods=1).max() - 1).where(ok)
         elif tr == 'CP10':
-            cp = df['CP3M'].rolling(10, min_periods=1).mean(); tb = df['TBILL3M'].rolling(10, min_periods=1).mean()
-            x = (cp - tb) * 100
+            # spread only on days both rates exist (CP3M is sparse), then its 10-day mean
+            x = ((df['CP3M'] - df['TBILL3M']) * 100).rolling(10, min_periods=1).mean()
             x.iloc[:9] = np.nan
         else:
             x = c[ck]
@@ -68,6 +72,9 @@ def reference(span=5, K=3, thr=(0.60, 0.25, -0.25, -0.75)):
         if e > thr[3]: return 'Risk-Off'
         return 'Strong Risk-Off'
     raw = ema.apply(lab)
+    # directional confirmation: kdn days all below the confirmed regime move it down to the mildest of them,
+    # kup days all above move it up (fear arrives faster than confidence returns)
+    ro = raw.map(ORD).values
     streak, conf, days = [], [], []
     for i, r in enumerate(raw):
         if r == '':
@@ -75,7 +82,15 @@ def reference(span=5, K=3, thr=(0.60, 0.25, -0.25, -0.75)):
         s = (streak[-1] + 1) if (i > 0 and raw.iloc[i - 1] == r and not np.isnan(streak[-1])) else 1
         streak.append(s)
         prevc = conf[-1] if conf else ''
-        cc = r if (s >= K or prevc == '') else prevc
+        if prevc == '':
+            cc = r
+        else:
+            p = ORD[prevc]
+            dn = ro[i - kdn + 1:i + 1] if i >= kdn - 1 else ro[:0]
+            up = ro[i - kup + 1:i + 1] if i >= kup - 1 else ro[:0]
+            if len(dn) == kdn and not np.isnan(dn).any() and dn.max() < p: p = dn.max()
+            elif len(up) == kup and not np.isnan(up).any() and up.min() > p: p = up.min()
+            cc = LBL[int(p)]
         conf.append(cc)
         dd = (days[-1] + 1) if (len(conf) > 1 and conf[-2] == cc and not np.isnan(days[-1])) else 1
         days.append(dd)
@@ -107,7 +122,8 @@ def diag_latest(df, c, X, Z, out):
     D['CPZ'] = Z.loc[last, 'CP'] * dirs['CP']
     m = df['SPX'].notna() & df['UST10Y'].notna()
     sp = df.loc[m, 'SPX'].values[-61:]; ty = df.loc[m, 'UST10Y'].values[-61:]
-    D['SBC'] = float(np.corrcoef(np.log(sp[1:] / sp[:-1]), ty[1:] - ty[:-1])[0, 1])
+    # stock–bond correlation in the market convention: bond price return ≈ −Δyield
+    D['SBC'] = float(np.corrcoef(np.log(sp[1:] / sp[:-1]), -(ty[1:] - ty[:-1]))[0, 1])
     win = c.iloc[-41:]
     rsp = np.log(win['SPX'].values[1:] / win['SPX'].values[:-1])
     raj = np.log(win['AUDJPY'].values[1:] / win['AUDJPY'].values[:-1])

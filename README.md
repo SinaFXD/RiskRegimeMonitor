@@ -30,7 +30,7 @@ The site updates itself every business day and is available in Persian and Engli
 
 ```
 FRED + ECB data ─► transform ─► rolling z-score (252d, capped ±3, signed) ─► 5 category scores
-   ─► RAI (weighted mean) ─► 5-day EMA ─► regime label ─► confirmed after 3 days in a row
+   ─► RAI (weighted mean) ─► 5-day EMA ─► regime label ─► confirmed (2 days down, 3 days up)
    ─► regime type (11 patterns × 5 conditions) ─► playbook, alerts, FX Board
 ```
 
@@ -40,8 +40,8 @@ FRED + ECB data ─► transform ─► rolling z-score (252d, capped ±3, signe
    direction, so a positive number always means "good for risk".
 3. **Aggregate.** Each category score is the mean signed z of its available indicators. The RAI is the weighted mean
    of the categories; weights are re-normalised when data is missing.
-4. **Label.** The 5-day EMA of the RAI is compared with fixed thresholds. The regime changes only after the new
-   label holds for 3 consecutive days.
+4. **Label.** The 5-day EMA of the RAI is compared with fixed thresholds. Confirmation is directional: 2 consecutive
+   days below the current regime move it down (to the mildest of those labels), 3 consecutive days above move it up.
 5. **Explain.** 11 regime types are scored on 5 conditions each (z-scores of 20-day changes in yields, breakevens,
    real yields, oil, USDJPY and USD, plus category scores and correlations). The primary type is chosen within
    the current regime's family.
