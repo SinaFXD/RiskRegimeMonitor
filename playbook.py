@@ -1,4 +1,4 @@
-"""Regime patterns (Playbook) and FX Board universe — shared by build.py (Excel) and export_site.py (web).
+"""Regime patterns (Playbook) and FX Board universe — used by export_site.py.
 
 Wording: Persian sentences, but financial terms stay in English (Carry, Safe haven, Tail risk, ...).
 Lists of currency codes use English commas so they render as one left-to-right run.

@@ -1,4 +1,4 @@
-"""Single source of truth for the workbook layout (used by build.py and verify.py)."""
+"""Single source of truth: data series, indicators, categories, regimes and model parameters."""
 import os
 FRED_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'fred')
 ECB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'ecb')
@@ -6,17 +6,13 @@ ECB_FILE = os.path.join(ECB_DIR, 'ECB_EXR.csv')
 import pandas as pd, numpy as np
 
 START = '2022-11-01'
-HDR = 4          # header row on Data / Clean / History
-FIRST = 5        # first data row
-BUFFER = 250     # pre-built formula rows beyond the last data row
 
-# ---- Data columns: (letter, key, header, FRED id, TradingView, unit/notes) ----
-_DC = [
+# ---- Data series: (key, header, FRED id, TradingView, unit/notes) ----
+DATA_COLS = [
  ('DATE','Date',None,None,'تاریخ'),
  ('VIX','VIX','VIXCLS','CBOE:VIX','S&P 500 30-day implied volatility'),
  ('VIX3M','VIX3M','VXVCLS','CBOE:VIX3M','S&P 500 3-month implied volatility'),
  ('VXEEM','VXEEM','VXEEMCLS','CBOE:VXEEM','EM equity implied volatility'),
- ('MOVE','MOVE',None,'TVC:MOVE','Treasury implied volatility (optional)'),
  ('HY_OAS','HY OAS %','BAMLH0A0HYM2','FRED:BAMLH0A0HYM2','ICE BofA US High Yield OAS'),
  ('IG_OAS','IG OAS %','BAMLC0A0CM','FRED:BAMLC0A0CM','ICE BofA US Investment Grade OAS'),
  ('EM_OAS','EM Corp OAS %','BAMLEMCBPIOAS','FRED:BAMLEMCBPIOAS','ICE BofA EM Corporate OAS'),
@@ -44,19 +40,9 @@ _DC = [
  ('USDKRW','USDKRW','DEXKOUS','FX_IDC:USDKRW',''),
  ('USDINR','USDINR','DEXINUS','FX_IDC:USDINR',''),
  ('USDCNY','USDCNY','DEXCHUS','FX_IDC:USDCNY',''),
- ('CUSTOM1','Custom 1',None,None,'Free slot for a custom series (e.g. Risk Reversal, CDX, CVIX)'),
  ('STLFSI','StL Fed FSI (w)','STLFSI4','FRED:STLFSI4','St. Louis Fed Financial Stress Index (weekly)'),
  ('NFCI','Chicago NFCI (w)','NFCI','FRED:NFCI','Chicago Fed National Financial Conditions Index (weekly)'),
 ]
-def _letter(i):
-    s = ''
-    i += 1
-    while i:
-        i, r = divmod(i - 1, 26)
-        s = chr(65 + r) + s
-    return s
-DATA_COLS = [(_letter(i),) + t for i, t in enumerate(_DC)]
-COL = {k: l for l, k, *_ in DATA_COLS}
 
 # ---- ECB gap-fill for FRED's weekly H.10 FX (see fetch_ecb.py) ----
 # key -> (ECB currency, True if quoted as USD per unit like FRED's DEXUS**)
@@ -73,12 +59,12 @@ ECB_CCYS = sorted({c for c, _ in ECB_PAIRS.values() if c != 'EUR'} | {'USD'} | s
 
 # ---- Indicators (composite) ----
 # id, name, name_fa, category, input, transform, direction, weight, freshness data key
-#   input: ('C', col) = Clean column (forward-filled) ; ('X', None) = History X column (computed transform)
+#   input: key of the forward-filled / derived input series built in reference2.reference()
 INDICATORS = [
  ('VIX','VIX','S&P 500 implied volatility','VOL','VIX','LEVEL',-1,1,'VIX'),
  ('VIXTS','VIX / VIX3M','VIX term structure (> 1 = inverted)','VOL','VIX_RATIO','LEVEL',-1,1,'VIX3M'),
  ('VXEEM','VXEEM','EM equity implied volatility','VOL','VXEEM','LEVEL',-1,1,'VXEEM'),
- ('MOVE','MOVE','Treasury implied volatility (optional)','VOL','MOVE','LEVEL',-1,1,'MOVE'),
+ ('USTRV','UST 10Y Realized Vol','10Y yield realized volatility, 20-day, bp/yr (MOVE proxy)','VOL','UST_RV','LEVEL',-1,1,'UST10Y'),
  ('HY','US HY OAS','US High Yield spread','CREDIT','HY_OAS','LEVEL',-1,1,'HY_OAS'),
  ('IG','US IG OAS','US Investment Grade spread','CREDIT','IG_OAS','LEVEL',-1,1,'IG_OAS'),
  ('EMC','EM Corp OAS','EM corporate spread','CREDIT','EM_OAS','LEVEL',-1,1,'EM_OAS'),
@@ -89,19 +75,7 @@ INDICATORS = [
  ('SPXDD','S&P 500 Drawdown','Distance from 52-week high','EQ','SPX','DD',1,1,'SPX'),
  ('USD','USD Broad','Fed broad dollar index, 20-day return','FUND','USD_BROAD','RET',-1,1,'USD_BROAD'),
  ('CP','CP–Bill Spread','Commercial paper – T-bill spread (10-day avg)','FUND','CP','CP10',-1,1,'CP3M'),
- ('C1','Custom 1','Custom series (transform set in Config)','FX','CUSTOM1','CUSTOM',1,1,'CUSTOM1'),
 ]
-# Clean sheet layout (forward-filled inputs + derived)
-CLEAN = [  # letter, key, header, kind
- ('A','DATE','Date','date'),
- ('B','VIX','VIX','ffill'), ('C','VIX3M','VIX3M','ffill'), ('D','VXEEM','VXEEM','ffill'), ('E','MOVE','MOVE','ffill'),
- ('F','HY_OAS','HY OAS %','ffill'), ('G','IG_OAS','IG OAS %','ffill'), ('H','EM_OAS','EM Corp OAS %','ffill'),
- ('I','SPX','S&P 500','ffill'), ('J','USD_BROAD','USD Broad','ffill'), ('K','CUSTOM1','Custom 1','ffill'),
- ('L','AUDJPY','AUDJPY','cross'), ('M','EURCHF','EURCHF','cross'), ('N','EMFX','EM FX Basket','basket'),
- ('O','VIX_RATIO','VIX/VIX3M','ratio'),
-]
-CCOL = {k: l for l, k, h, kind in CLEAN}
-
 CATS = [  # code, fa, en, weight
  ('VOL','نوسان','Volatility',0.20),
  ('CREDIT','اعتبار','Credit',0.20),
@@ -124,14 +98,10 @@ REGIMES_POST_EN = {  # English posture text for the web dashboard
  'Strong Risk-Off': 'Capital preservation; cut gross; liquidity and hedging; wait for a confirmed reversal',
 }
 
-# Config sheet addresses
-CFG = dict(SPAN='Config!$B$6', ALPHA='Config!$B$7', K='Config!$B$8', TSON='Config!$B$9', TON='Config!$B$10',
-           TOFF='Config!$B$11', TSOFF='Config!$B$12', STALE='Config!$B$13', LR='Config!$B$14', LD='Config!$B$15')
 LB, NW, CAPV = 252, 20, 3      # fixed structural parameters (z lookback, change window, winsor cap)
-CFG_CAT_ROW0 = 22      # category rows 22..26 (A code, B fa, C en, D weight)
-CFG_IND_ROW0 = 31      # indicator rows 31..45
-CFG_REG_ROW0 = 50      # regime label rows 50..54
-CFG_MAT_ROW0 = 58      # weight matrix rows 58..62 (5 categories) + 63 (enabled)
+# Absolute-level guardrail: z-scores are relative to the last LB days, so a long crisis slowly looks "normal".
+# These levels flag stress regardless of z (VIX in points, HY OAS in %). Alert only; the regime logic is unchanged.
+GUARD = dict(VIX=30.0, HY=5.0)
 
 def ld(fid):
     d = pd.read_csv(os.path.join(FRED_DIR, f'{fid}.csv' if fid != 'DCPF3M' else 'x_DCPF3M.csv'),
@@ -143,7 +113,7 @@ def ld(fid):
 
 def load_data():
     s = {}
-    for l, k, h, fid, tv, note in DATA_COLS:
+    for k, h, fid, tv, note in DATA_COLS:
         if fid and k not in ('STLFSI', 'NFCI'):
             s[k] = ld(fid)
     df = pd.concat(s, axis=1, sort=True)
@@ -158,10 +128,10 @@ def load_data():
             pos = df.index.searchsorted(d, side='right') - 1
             if pos >= 0 and d >= df.index[0]:
                 df.iloc[pos, df.columns.get_loc(k)] = v
-    for l, k, *_ in DATA_COLS[1:]:
+    for k, *_ in DATA_COLS[1:]:
         if k not in df.columns:
             df[k] = np.nan
-    df = df[[k for _, k, *_ in DATA_COLS[1:]]].copy()
+    df = df[[k for k, *_ in DATA_COLS[1:]]].copy()
     df.attrs['ecb_fill'] = ecb_fill(df)
     return df
 

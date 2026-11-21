@@ -1,4 +1,4 @@
-"""Independent pandas re-implementation of the LEAN workbook semantics (for verification)."""
+"""The model: pandas implementation of transforms, z-scores, categories, RAI, regime and regime types."""
 import numpy as np, pandas as pd
 from spec import *
 
@@ -9,7 +9,7 @@ def reference(span=5, K=3, thr=(0.60, 0.25, -0.25, -0.75)):
     df = load_data()
     n = len(df)
     c = pd.DataFrame(index=df.index)
-    for k in ['VIX', 'VIX3M', 'VXEEM', 'MOVE', 'HY_OAS', 'IG_OAS', 'EM_OAS', 'SPX', 'USD_BROAD', 'CUSTOM1']:
+    for k in ['VIX', 'VIX3M', 'VXEEM', 'HY_OAS', 'IG_OAS', 'EM_OAS', 'SPX', 'USD_BROAD']:
         c[k] = df[k].ffill()
     both = df['AUDUSD'].notna() & df['USDJPY'].notna()
     c['AUDJPY'] = (df['AUDUSD'] * df['USDJPY']).where(both).ffill()
@@ -20,6 +20,9 @@ def reference(span=5, K=3, thr=(0.60, 0.25, -0.25, -0.75)):
     allp = df[legs].notna().all(axis=1)
     c['EMFX'] = (100 * (base / df[legs]).mean(axis=1)).where(allp).ffill()
     c['VIX_RATIO'] = c['VIX'] / c['VIX3M']
+    # MOVE proxy: realized vol of daily 10Y yield changes over NW days, annualised, in bp
+    ty = df['UST10Y'].dropna()
+    c['UST_RV'] = ((ty.diff() * 100).rolling(NW).std() * np.sqrt(252)).reindex(df.index).ffill()
     X = {}
     for iid, name, fa, cat, ck, tr, d, w, fk in INDICATORS:
         if tr == 'RET':
@@ -32,8 +35,6 @@ def reference(span=5, K=3, thr=(0.60, 0.25, -0.25, -0.75)):
             cp = df['CP3M'].rolling(10, min_periods=1).mean(); tb = df['TBILL3M'].rolling(10, min_periods=1).mean()
             x = (cp - tb) * 100
             x.iloc[:9] = np.nan
-        elif tr == 'CUSTOM':
-            x = c[ck]
         else:
             x = c[ck]
         X[iid] = x

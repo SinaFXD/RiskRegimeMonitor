@@ -133,6 +133,12 @@ select.sel { font: inherit; font-size: 13px; color: var(--ink); background: var(
 @media (prefers-reduced-motion: reduce) { .live { animation: none; } }
 .regime-name { font-size: 42px; font-weight: 800; line-height: 1.15; color: var(--rc-t); margin: 6px 0 0; letter-spacing: -.02em; }
 .regime-en { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink-2); font-size: 15px; font-weight: 500; margin-top: 2px; }
+.guard { display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; padding: 10px 12px; border-radius: 10px;
+  background: color-mix(in srgb, var(--warn) 10%, transparent); border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent); font-size: 13px; }
+.guard .ic { color: var(--warn); flex: none; width: 18px; height: 18px; } .guard .ic svg { width: 18px; height: 18px; }
+.guard b { display: block; font-weight: 600; margin-bottom: 2px; } .guard span { color: var(--ink-2); }
+.guard.hot { background: color-mix(in srgb, var(--soff) 14%, transparent); border-color: color-mix(in srgb, var(--soff) 45%, transparent); }
+.guard.hot .ic { color: var(--soff-t); }
 .posture { margin: 14px 0 0; color: var(--ink-2); font-size: 14px; max-width: 60ch; }
 @media (max-width: 560px) { .regime-name { font-size: 34px; } }
 

@@ -233,6 +233,18 @@ const heatBg = (v, cap = 0.05) => {
 };
 const stIcon = (kind, label) => `<span class="st ${kind}">${kind === 'good' ? IC.check : kind === 'off' ? IC.dash : IC.warn}${label}</span>`;
 
+/* absolute-level guardrail: z-scores are relative, these levels are not */
+function guardBanner(gd) {
+  if (!gd || !gd.on) return '';
+  const G = D.meta.guard;
+  const why = [gd.vix && `VIX ${f2(gd.vix_v, 1)} ≥ ${G.VIX}`, gd.hy && `HY OAS ≥ ${G.HY}%`].filter(Boolean).join(' · ');
+  const msg = gd.conflict
+    ? L('سطح مطلق استرس بالاست ولی مدل نسبی رژیم را Risk-Off نمی‌بیند؛ رژیم ممکن است استرس را کمتر از واقع نشان دهد.', 'Absolute stress is high, but the relative model does not read Risk-Off; the regime may be understating stress.')
+    : L('سطح مطلق استرس هم رژیم Risk-Off را تأیید می‌کند.', 'Absolute stress levels confirm the Risk-Off regime.');
+  return `<div class="guard ${gd.conflict ? 'hot' : ''}" data-tip="${L('Guardrail مستقل از z-score است', 'The guardrail does not depend on z-scores')}">
+    <span class="ic">${IC.warn}</span><div><b>Guardrail · <span class="num" dir="ltr">${why}</span></b><span>${msg}</span></div></div>`;
+}
+
 /* ================= OVERVIEW ================= */
 function renderOverview(el) {
   const k = D.kpi, g = REG[k.regime], t = T();
@@ -248,6 +260,7 @@ function renderOverview(el) {
       <div class="eyebrow"><span class="live"></span>${L('رژیم تأییدشده', 'Confirmed regime')} · ${N(k.date)}${jalali(k.date)}</div>
       <div class="regime-name">${g.fa}</div>
       <div class="regime-en">Raw signal: ${k.raw || '—'} · ${L(`${k.streak} روز پیاپی`, `${k.streak} days in a row`)}</div>
+      ${guardBanner(k.guard)}
       <div class="scale" aria-label="${L('موقعیت RAI روی مقیاس رژیم', 'RAI position on the regime scale')}">
         <div class="scale-track">
           ${zones.map(([z, a, b]) => `<span class="z" style="width:${(b - a) / (hi - lo) * 100}%;background:var(--${z.toLowerCase()})" data-tip="${REG[BYN[{ SOFF: -2, OFF: -1, NEU: 0, ON: 1, SON: 2 }[z]]].fa}: ${f2(a)} ${L('تا', 'to')} ${f2(b)}"></span>`).join('')}
@@ -595,7 +608,7 @@ function renderFX(el) {
 
 /* ================= INDICATORS ================= */
 function renderIndicators(el) {
-  const fmtVal = i => i.val == null ? '—' : i.id === 'CP' ? f2(i.val, 1) + ' bp' : ['VIXTS', 'EURCHF'].includes(i.id) ? f2(i.val, 4) : i.val.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  const fmtVal = i => i.val == null ? '—' : i.id === 'CP' ? f2(i.val, 1) + ' bp' : i.id === 'USTRV' ? f2(i.val, 0) + ' bp' : ['VIXTS', 'EURCHF'].includes(i.id) ? f2(i.val, 4) : i.val.toLocaleString('en-US', { maximumFractionDigits: 2 });
   el.innerHTML = `
   <div class="page-head fade-in"><div><h1>${L('شاخص‌ها', 'Indicators')}</h1><p>${L(`${D.inds.length} شاخص در 5 Category · Rolling z-score ${D.meta.lb} روزه، Capped در ±${D.meta.cap} · مثبت همیشه = Risk-On`, `${D.inds.length} indicators in 5 categories · ${D.meta.lb}-day rolling z-score, capped at ±${D.meta.cap} · positive always = Risk-On`)}</p></div></div>
   ${D.cats.map(c => {
@@ -765,7 +778,7 @@ const WX = () => ({
   SOFF: { ic: '⛈️', sky: L('طوفانی', 'Stormy'), plain: L('ترس شدید است؛ همه با هم از ریسک فرار می‌کنند.', 'Fear is intense; everyone is running from risk at the same time.'), todo: L('اولویت، حفظ سرمایه است. خیلی کم معامله کن، Hedge داشته باش و منتظر نشانه‌ی بهبود بمان.', 'Protecting capital comes first. Trade very little, stay hedged and wait for signs of improvement.') },
 });
 const CAT_SIMPLE = () => ({
-  VOL: [L('دماسنج ترس', 'Fear thermometer'), L('نشان می‌دهد قیمت‌ها چقدر تکان می‌خورند. VIX که بالا برود یعنی سرمایه‌گذارها نگران‌اند.', 'Shows how much prices are swinging. When VIX rises, investors are worried.')],
+  VOL: [L('دماسنج ترس', 'Fear thermometer'), L('نشان می‌دهد قیمت‌ها چقدر تکان می‌خورند. VIX که بالا برود یعنی سرمایه‌گذارها نگران‌اند. نوسان بازده ۱۰ ساله آمریکا هم اینجاست، چون استرس گاهی اول در Bonds دیده می‌شود.', 'Shows how much prices are swinging. When VIX rises, investors are worried. Swings in the US 10-year yield are here too, because stress sometimes shows up in bonds first.')],
   CREDIT: [L('اعتماد به شرکت‌ها', 'Trust in companies'), L('اگر شرکت‌ها برای قرض گرفتن بهره‌ی خیلی بیشتری بدهند (Spread بالا)، یعنی بازار به آن‌ها اعتماد ندارد.', 'If companies must pay much more interest to borrow (a high Spread), the market does not trust them.')],
   FX: [L('رفتار ارزها', 'Currency behaviour'), L('ارزهای پرریسک (مثل AUD و ارزهای EM) در برابر ارزهای امن (مثل JPY و CHF) قوی شده‌اند یا ضعیف؟', 'Have risky currencies (like AUD and EM currencies) strengthened or weakened against safe ones (like JPY and CHF)?')],
   EQ: [L('حال بازار سهام', 'Stock-market mood'), L('S&P 500 در یک ماه اخیر بالا رفته؟ چقدر از سقفش فاصله دارد؟', 'Has the S&P 500 risen over the past month? How far is it from its high?')],
@@ -797,6 +810,7 @@ const GLOSSARY = () => [
   ['Correlation', L('اینکه دو چیز با هم بالا و پایین می‌روند یا نه. +1 یعنی کاملاً با هم، −1 یعنی برعکس هم.', 'Whether two things move up and down together. +1 means fully together, −1 means exact opposites.')],
   ['Divergence', L('وقتی دو چیزی که معمولاً با هم حرکت می‌کنند از هم جدا شوند؛ یک زنگ خطر.', 'When two things that usually move together split apart — a warning bell.')],
   ['Hedge', L('بیمه‌ی معامله؛ چیزی که اگر اتفاق بد بیفتد، ضررت را کم می‌کند.', 'Insurance for a trade: something that cuts your loss if the bad thing happens.')],
+  ['Guardrail', L(`ترمز اضطراری مدل. z-score فقط با یک سال گذشته مقایسه می‌کند؛ اگر بحران طولانی شود، کم‌کم «عادی» به نظر می‌رسد. Guardrail سطح مطلق را هم چک می‌کند: VIX بالای ${D.meta.guard.VIX} یا HY OAS بالای ${D.meta.guard.HY}% یعنی استرس واقعی، مهم نیست z چه بگوید.`, `The model's emergency brake. A z-score only compares with the past year, so a long crisis slowly starts to look "normal". The guardrail also checks absolute levels: VIX above ${D.meta.guard.VIX} or HY OAS above ${D.meta.guard.HY}% means real stress, whatever the z-score says.`)],
   ['Tail risk', L('خطرِ اتفاق‌های نادر ولی خیلی بد.', 'The risk of rare but very bad events.')],
   ['Drawdown', L('چقدر قیمت از بالاترین سطحش پایین آمده.', 'How far the price has fallen from its highest level.')],
   ['Yield (10Y, 2Y)', L('سودی که اوراق قرضه‌ی دولت آمریکا می‌دهد. 10Y یعنی ۱۰ ساله، 2Y یعنی ۲ ساله.', 'The return paid by US government bonds. 10Y means 10-year, 2Y means 2-year.')],
@@ -937,6 +951,7 @@ function renderGuide(el) {
       <p><b>Smoothing و Confirmation:</b> EMA ${D.meta.span} روزه؛ رژیم پس از ${K} روز پیاپی برچسب جدید عوض می‌شود. آستانه‌ها: ${N(range.SON)}، ${N(range.ON)}، ${N(range.NEU)}، ${N(range.OFF)}، ${N(range.SOFF)}.</p>
       <p><b>Regime type:</b> 5 شرط روی z-score تغییرات ${D.meta.nw} روزه (Yields، Breakeven، Real yield، WTI، USDJPY، USD)، Category scoreها و Correlationها. هر شرط یک Margin بین −1 و +1 دارد؛ Strength = میانگین Marginها. نوع اصلی از میان الگوهای هم‌خانواده با رژیم فعلی انتخاب می‌شود.</p>
       <p><b>داده:</b> FRED، و برای روزهای بعد از آخرین انتشار هفتگی H.10، ECB reference rates (با زنجیر کردن تغییرات روزانه روی آخرین عدد FRED). Spreadهای ICE در FRED فقط از نوامبر 2023 در دسترس‌اند.</p>
+      <p><b>Guardrail:</b> مستقل از z-score، اگر VIX ≥ ${D.meta.guard.VIX} یا HY OAS ≥ ${D.meta.guard.HY}% باشد Alert فعال می‌شود؛ اگر همزمان رژیم Neutral یا بهتر باشد، Overview هشدار می‌دهد که رژیم ممکن است استرس را کم نشان دهد. منطق رژیم را تغییر نمی‌دهد.</p>
       <p><b>محدودیت‌ها:</b> z-score نسبی است؛ پس از یک سال آرام، افزایش معمولی هم «استرس» دیده می‌شود. شاخص رژیم را نشان می‌دهد نه Entry point؛ آن را با Positioning، Valuation و Catalystها ترکیب کن.</p>`, `
       <p><b>Transforms:</b> LEVEL = the level itself (volatility and spreads); RET = ${D.meta.nw}-day log return; DD = drawdown from the ${D.meta.lb}-day high; CP10 = 10-day average of the CP – T-bill spread.</p>
       <p><b>Rolling z-score:</b> z = (x − ${D.meta.lb}-day mean) ÷ ${D.meta.lb}-day std dev, capped at ±${D.meta.cap}, multiplied by the indicator's direction (signed z).</p>
@@ -944,6 +959,7 @@ function renderGuide(el) {
       <p><b>Smoothing and confirmation:</b> ${D.meta.span}-day EMA; the regime changes after ${K} consecutive days with a new label. Thresholds: ${N(range.SON)}, ${N(range.ON)}, ${N(range.NEU)}, ${N(range.OFF)}, ${N(range.SOFF)}.</p>
       <p><b>Regime type:</b> 5 conditions on the z-score of ${D.meta.nw}-day changes (yields, breakeven, real yield, WTI, USDJPY, USD), category scores and correlations. Each condition has a margin between −1 and +1; Strength = mean of the margins. The primary type is chosen among patterns in the same family as the current regime.</p>
       <p><b>Data:</b> FRED, plus ECB reference rates for the days after the latest weekly H.10 release (chaining daily changes onto FRED's last value). ICE spreads are only available on FRED from November 2023.</p>
+      <p><b>Guardrail:</b> independent of the z-scores, an alert fires when VIX ≥ ${D.meta.guard.VIX} or HY OAS ≥ ${D.meta.guard.HY}%; if the regime is Neutral or better at the same time, the overview warns that the regime may be understating stress. It does not change the regime logic.</p>
       <p><b>Limitations:</b> the z-score is relative — after a calm year, an ordinary rise can register as "stress". The index shows the regime, not an entry point; combine it with positioning, valuation and catalysts.</p>`)}
     </div>
     <div class="c4"><div class="tbl-wrap" style="max-height:520px;overflow:auto"><table class="tbl"><thead><tr><th>Data dictionary</th><th>FRED</th></tr></thead><tbody>

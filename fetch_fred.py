@@ -3,7 +3,7 @@ import os, sys, time, urllib.request
 from spec import DATA_COLS, FRED_DIR
 
 START = '2021-01-01'
-IDS = sorted({fid for _, _, _, fid, _, _ in DATA_COLS if fid})
+IDS = sorted({fid for _, _, fid, _, _ in DATA_COLS if fid})
 
 def fetch(fid):
     url = f'https://fred.stlouisfed.org/graph/fredgraph.csv?id={fid}&cosd={START}'

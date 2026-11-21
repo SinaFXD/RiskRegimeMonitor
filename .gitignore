@@ -5,7 +5,7 @@ __pycache__/
 # raw source data: downloaded fresh by fetch_fred.py (ICE BofA / S&P / CBOE series are not ours to redistribute)
 /data/
 
-# Excel prototype: the hand-formatted template and generated workbooks stay local
+# retired Excel prototype (removed from the repo): keep any local copies out of git
 /template/
 /output/
 *.xlsx

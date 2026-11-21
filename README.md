@@ -6,10 +6,13 @@
 
 ## چه می‌کند؟
 
-15 شاخص بازار در 5 Category (Volatility، Credit، FX، Equities & Growth، Funding & USD) با Rolling z-score
+14 شاخص بازار در 5 Category (Volatility، Credit، FX، Equities & Growth، Funding & USD) با Rolling z-score
 252 روزه ترکیب می‌شوند و Risk Appetite Index (RAI) را می‌سازند. RAI با EMA هموار می‌شود و رژیم بازار
 (Strong Risk-On تا Strong Risk-Off) پس از Confirmation تعیین می‌شود. 11 Regime type (مثل Credit Stress،
 Carry Unwind، Inflation Shock) توضیح می‌دهند Risk-Off یا Risk-On از چه نوعی است و کدام Safe haven کار می‌کند.
+
+یک Guardrail مطلق هم مستقل از z-score کار می‌کند: اگر VIX ≥ 30 یا HY OAS ≥ 5% باشد Alert فعال می‌شود، چون z-score
+نسبی است و در یک بحران طولانی کم‌کم «عادی» نشان می‌دهد.
 
 بخش‌های سایت: نمای کلی، تاریخچه و آمار رژیم‌ها، FX Board، شاخص‌ها، Playbook، Model Lab (تغییر پارامترها و
 محاسبه دوباره مدل در مرورگر) و روش‌شناسی.
@@ -41,7 +44,6 @@ python -m http.server 8765 --directory site
 | `reference2.py` | پیاده‌سازی مدل با pandas |
 | `export_site.py` | محاسبه کامل و خروجی JSON برای سایت |
 | `fetch_fred.py`, `fetch_ecb.py` | دریافت داده |
-| `build.py`, `update_template.py`, `update_excel.py` | نسخه Excel (نمونه اولیه) |
 | `site/` | وب‌سایت (HTML + JS + CSS، بدون Build step) |
 
 منابع داده: FRED (St. Louis Fed)، ECB، ICE BofA، CBOE. داده‌های ICE BofA فقط به‌صورت z-score نمایش داده می‌شوند.

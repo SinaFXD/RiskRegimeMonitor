@@ -2,7 +2,7 @@
 
     python fetch_fred.py && python export_site.py
 
-Everything the Excel Dashboard / FX Board / Playbook shows is computed here; the site only renders it
+Everything the dashboard, FX Board and Playbook show is computed here; the site only renders it
 (plus client-side re-weighting in the Model Lab, which uses the exported signed z-scores).
 """
 import os, json, math, warnings
@@ -103,6 +103,11 @@ def main():
                pct=num((hist['EMA'] <= ema.iloc[-1]).mean()), days=int(out['DAYS'].iloc[-1]),
                breadth=num(out['BREADTH'].iloc[-1]), raw=out['RAW'].iloc[-1], streak=int(out['STREAK'].iloc[-1]),
                date=str(LD.date()))
+    # ---- absolute-level guardrail (independent of the rolling z-scores) ----
+    vix, hy = c['VIX'].iloc[-1], c['HY_OAS'].iloc[-1]
+    g_vix, g_hy = bool(vix >= GUARD['VIX']), bool(hy >= GUARD['HY'])
+    kpi['guard'] = dict(on=g_vix or g_hy, vix=g_vix, hy=g_hy, vix_v=num(vix, 2),
+                        conflict=(g_vix or g_hy) and 'Off' not in reg)
 
     cats = []
     for code, fa, en, w in CATS:
@@ -166,10 +171,17 @@ def main():
     # ---- alerts ----
     V = D
     E = {c_['code']: c_['v'] for c_ in cats}
-    stale_n = sum(i['stale'] for i in inds if i['id'] not in ('MOVE', 'C1'))
+    stale_n = sum(i['stale'] for i in inds)
     n_cats = sum(v is not None for v in E.values())
     ro = 'Off' in reg
     A = [  # (text fa, text en), on, value, threshold -- value/threshold may be a (fa, en) pair
+        (('Guardrail: استرس مطلق بالاست ولی رژیم Risk-Off نیست', 'Guardrail: absolute stress is high but the regime is not Risk-Off'),
+         kpi['guard']['conflict'], reg,
+         ('VIX یا HY OAS بالای آستانه و رژیم Neutral یا بهتر', 'VIX or HY OAS above its level and the regime Neutral or better')),
+        (('Guardrail: VIX در سطح مطلق استرس', 'Guardrail: VIX at an absolute stress level'),
+         g_vix, f"{vix:.1f}", f"≥ {GUARD['VIX']:.0f}"),
+        (('Guardrail: HY OAS در سطح مطلق استرس', 'Guardrail: HY OAS at an absolute stress level'),
+         g_hy, ('بالای آستانه', 'above') if g_hy else ('زیر آستانه', 'below'), f"≥ {GUARD['HY']:.0f}%"),   # ICE: no level shown
         (('VIX term structure معکوس شده (VIX > VIX3M) — استرس حاد', 'VIX term structure inverted (VIX > VIX3M) — acute stress'),
          V['VIXR'] > 1, f"{V['VIXR']:.2f}", '> 1.00'),
         (('Credit رالی Equities را تأیید نمی‌کند', 'Credit is not confirming the equity rally'),
@@ -271,7 +283,7 @@ def main():
                    mkt={k: arr(c.loc[H.index, k], 4) for k in ['SPX', 'VIX', 'AUDJPY', 'USD_BROAD', 'EMFX']},
                    types=th)
 
-    # ---- regime episodes & statistics (beyond the workbook) ----
+    # ---- regime episodes & statistics ----
     eps, cur = [], None
     for d_, r in H['REG'].items():
         if not r:
@@ -294,13 +306,13 @@ def main():
 
     data = dict(
         meta=dict(updated=pd.Timestamp.now(tz='UTC').strftime('%Y-%m-%d %H:%M UTC'), last=str(LD.date()),
-                  lb=LB, nw=NW, cap=CAPV, span=SPAN, k=K, thr=THR, stale=STALE,
+                  lb=LB, nw=NW, cap=CAPV, span=SPAN, k=K, thr=THR, stale=STALE, guard=GUARD,
                   ecb_from=str(min(fills.values()).date()) if fills else None),
         kpi=kpi, regimes=[dict(reg=l, fa=f, budget=b, post=p, post_en=REGIMES_POST_EN[l]) for l, f, b, p in REGIMES],
         cats=cats, inds=inds, types=types, primary=prim, secondary=sec, alerts=alerts, diag=diag, weekly=weekly,
         fx=fx, fxg=gavg, history=history, episodes=eps, stats=stats,
         indicators_def=[dict(id=i[0], cat=i[3], dir=i[6], w=i[7]) for i in INDICATORS],
-        datacols=[dict(k=k, h=h, fred=fid, tv=tv, note=note) for _, k, h, fid, tv, note in DATA_COLS[1:]],
+        datacols=[dict(k=k, h=h, fred=fid, tv=tv, note=note) for k, h, fid, tv, note in DATA_COLS[1:]],
     )
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, 'w', encoding='utf-8') as f:
