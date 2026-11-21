@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.tmp
+
+# raw source data: downloaded fresh by fetch_fred.py (ICE BofA / S&P / CBOE series are not ours to redistribute)
+/data/
+
+# Excel prototype: the hand-formatted template and generated workbooks stay local
+/template/
+/output/
+*.xlsx
+
+.claude/settings.local.json

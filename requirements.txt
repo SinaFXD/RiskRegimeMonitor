@@ -1,0 +1,5 @@
+pandas
+numpy
+openpyxl
+# optional, to write through Excel and keep native charts:
+# xlwings
