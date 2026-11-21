@@ -101,7 +101,7 @@ function isolateLatin(root) {
       const [pre, core, post] = trimRun(m);
       if (!core.trim()) return m;
       frag.append(n.data.slice(last, off) + pre);
-      const sp = document.createElement('span'); sp.className = 'en-i'; sp.textContent = core; frag.append(sp);
+      const sp = document.createElement('span'); sp.className = core.length <= 24 ? 'en-i nw' : 'en-i'; sp.textContent = core; frag.append(sp);
       last = off + m.length - post.length;
       return m;
     });
@@ -731,31 +731,195 @@ function renderLab(el) {
 const ctl = (k, l, v, min, max, step) => `<div class="ctl"><label><span>${l}</span><b data-out="${k}">${Number.isInteger(v) ? v : f2(v)}</b></label><input type="range" data-k="${k}" min="${min}" max="${max}" step="${step}" value="${v}"></div>`;
 
 /* ================= GUIDE ================= */
+// plain-language guide: weather analogy, today's reading from live data, daily routine, glossary, FAQ
+const WX = {
+  SON: { ic: '☀️', sky: 'آفتابی کامل', plain: 'همه شجاع‌اند و پول با خیال راحت به سمت دارایی‌های پرریسک می‌رود.', todo: 'می‌توانی با اندازه‌ی معمول معامله کنی. ارزهای پرریسک و Carry معمولاً خوب جواب می‌دهند.' },
+  ON: { ic: '🌤️', sky: 'بیشتر آفتابی', plain: 'حال بازار خوب است، ولی نه بی‌نقص.', todo: 'معامله‌ی معمولی، ولی گزینش‌گر باش و دنبال هر فرصتی نرو.' },
+  NEU: { ic: '⛅', sky: 'ابری', plain: 'نشانه‌ها با هم نمی‌خوانند و جهت بازار معلوم نیست.', todo: 'معامله‌های کوچک‌تر. صبر کن تا هوا روشن‌تر شود.' },
+  OFF: { ic: '🌧️', sky: 'بارانی', plain: 'بازار نگران است و پول به سمت جاهای امن (Safe haven) می‌رود.', todo: 'اندازه‌ی معامله را کم کن، Carry را کم کن و حواست به Safe havenها باشد.' },
+  SOFF: { ic: '⛈️', sky: 'طوفانی', plain: 'ترس شدید است؛ همه با هم از ریسک فرار می‌کنند.', todo: 'اولویت، حفظ سرمایه است. خیلی کم معامله کن، Hedge داشته باش و منتظر نشانه‌ی بهبود بمان.' },
+};
+const CAT_SIMPLE = {
+  VOL: ['دماسنج ترس', 'نشان می‌دهد قیمت‌ها چقدر تکان می‌خورند. VIX که بالا برود یعنی سرمایه‌گذارها نگران‌اند.'],
+  CREDIT: ['اعتماد به شرکت‌ها', 'اگر شرکت‌ها برای قرض گرفتن بهره‌ی خیلی بیشتری بدهند (Spread بالا)، یعنی بازار به آن‌ها اعتماد ندارد.'],
+  FX: ['رفتار ارزها', 'ارزهای پرریسک (مثل AUD و ارزهای EM) در برابر ارزهای امن (مثل JPY و CHF) قوی شده‌اند یا ضعیف؟'],
+  EQ: ['حال بازار سهام', 'S&P 500 در یک ماه اخیر بالا رفته؟ چقدر از سقفش فاصله دارد؟'],
+  FUND: ['کمبود دلار', 'اگر دلار ناگهان خیلی قوی شود یا قرض گرفتن کوتاه‌مدت گران شود، یعنی دنیا دنبال دلار است؛ نشانه‌ی ترس.'],
+};
+const GLOSSARY = [
+  ['Risk-On', 'حالتی که سرمایه‌گذارها شجاع‌اند و دارایی‌های پرریسک (سهام، ارزهای پربازده) را می‌خرند.'],
+  ['Risk-Off', 'حالتی که سرمایه‌گذارها می‌ترسند و پولشان را به جای امن می‌برند.'],
+  ['RAI (Risk Appetite Index)', 'عدد اصلی این سایت؛ دماسنجِ شجاعتِ بازار. بالای صفر یعنی شجاعت، زیر صفر یعنی ترس. معمولاً بین −2 و +2 است.'],
+  ['EMA', 'میانگینِ نرمِ چند روز اخیر. باعث می‌شود یک روز عجیب، عدد را ناگهان بالا و پایین نکند.'],
+  ['Raw RAI', 'RAI خودِ امروز، قبل از نرم شدن با EMA. تندتر تکان می‌خورد.'],
+  ['z-score', 'می‌گوید امروز چقدر با یک سال گذشته فرق دارد. 0 یعنی عادی، +2 یعنی خیلی بالاتر از عادی، −2 یعنی خیلی پایین‌تر. مثل مقایسه‌ی قد تو با میانگین قد هم‌کلاسی‌ها.'],
+  ['Signed z', 'همان z-score، ولی علامتش طوری تنظیم شده که مثبت همیشه یعنی «خوب برای ریسک» و منفی یعنی «ترس». مثلاً VIX بالا برود، Signed z آن منفی می‌شود.'],
+  ['Category', 'گروهی از شاخص‌ها که یک موضوع را می‌سنجند؛ مثل یک درس در کارنامه. ۵ Category داریم.'],
+  ['Regime', 'وضعیت کلی بازار؛ یکی از ۵ حالت، از Strong Risk-On تا Strong Risk-Off.'],
+  ['Confirmation', 'قانون صبر: رژیم فقط وقتی عوض می‌شود که نشانه‌ی جدید چند روز پشت سر هم تکرار شود.'],
+  ['Raw signal', 'رژیمی که فقط عدد امروز نشان می‌دهد، قبل از قانون Confirmation.'],
+  ['Regime type', 'دلیلِ رژیم. Risk-Off می‌تواند از ترسِ رکود باشد یا از تورم؛ درمان هر کدام فرق دارد.'],
+  ['Breadth', 'چند درصد شاخص‌ها مثبت‌اند؛ مثل اینکه بپرسی چند نفر از کلاس دستشان را بالا برده‌اند.'],
+  ['Percentile', 'رتبه‌ی امروز بین همه‌ی روزهای ثبت‌شده. 10% یعنی از هر ۱۰۰ روز، فقط ۱۰ روز این‌قدر بد یا بدتر بوده.'],
+  ['Δ5', 'تغییر نسبت به ۵ روز کاری قبل (حدود یک هفته). مثبت یعنی بهتر شده، منفی یعنی بدتر.'],
+  ['Risk budget', 'چه مقدار از ریسکِ همیشگی‌ات را الان استفاده کنی. 50% یعنی نصفِ حالت معمول.'],
+  ['Safe haven', 'جای امن؛ دارایی‌هایی که موقع ترس معمولاً قوی می‌شوند: JPY، CHF، USD و طلا.'],
+  ['Carry', 'قرض گرفتن ارزی با بهره‌ی کم (مثل JPY) و خریدن ارزی با بهره‌ی زیاد (مثل MXN) برای گرفتن اختلاف بهره. در هوای آرام سود می‌دهد، در طوفان ضرر سنگین.'],
+  ['High-beta', 'ارزهایی که تندتر از بقیه با حال بازار بالا و پایین می‌روند، مثل AUD، NZD و ZAR.'],
+  ['EM (Emerging Markets)', 'کشورهای در حال رشد، مثل مکزیک (MXN)، برزیل (BRL)، آفریقای جنوبی (ZAR) و کره (KRW).'],
+  ['Volatility / VIX', 'میزان تکان خوردن قیمت‌ها. VIX را «شاخص ترس» بازار سهام آمریکا می‌گویند.'],
+  ['Spread', 'بهره‌ی اضافه‌ای که یک شرکت نسبت به دولت آمریکا می‌دهد. بالا رفتنش یعنی بازار به شرکت‌ها کمتر اعتماد دارد.'],
+  ['Correlation', 'اینکه دو چیز با هم بالا و پایین می‌روند یا نه. +1 یعنی کاملاً با هم، −1 یعنی برعکس هم.'],
+  ['Divergence', 'وقتی دو چیزی که معمولاً با هم حرکت می‌کنند از هم جدا شوند؛ یک زنگ خطر.'],
+  ['Hedge', 'بیمه‌ی معامله؛ چیزی که اگر اتفاق بد بیفتد، ضررت را کم می‌کند.'],
+  ['Tail risk', 'خطرِ اتفاق‌های نادر ولی خیلی بد.'],
+  ['Drawdown', 'چقدر قیمت از بالاترین سطحش پایین آمده.'],
+  ['Yield (10Y, 2Y)', 'سودی که اوراق قرضه‌ی دولت آمریکا می‌دهد. 10Y یعنی ۱۰ ساله، 2Y یعنی ۲ ساله.'],
+  ['Breakeven', 'تورمی که بازار برای سال‌های آینده انتظار دارد.'],
+  ['Real yield', 'سود اوراق بعد از کم کردن تورم.'],
+  ['Long / Short', 'Long یعنی خرید به امید بالا رفتن؛ Short یعنی فروش به امید پایین رفتن.'],
+  ['Invalidation', 'نشانه‌ای که می‌گوید سناریو دیگر درست نیست و باید تجدیدنظر کنی.'],
+  ['ECB (برچسب زرد)', 'FRED نرخ ارزها را هفته‌ای یک بار منتشر می‌کند. برای روزهای بین، از نرخ‌های بانک مرکزی اروپا (ECB) تخمین می‌زنیم و بعداً عدد رسمی جایش می‌نشیند.'],
+];
 function renderGuide(el) {
+  const k = D.kpi, g = REG[k.regime], thr = D.meta.thr, K = D.meta.k;
+  const prim = D.types.find(x => x.code === D.primary), sec = D.types.find(x => x.code === D.secondary);
+  const rp = D.regimes.find(r => r.reg === k.regime) || {}, onA = D.alerts.filter(a => a.on);
+  const budget = Math.round((rp.budget || 0) * 100);
+  const range = { SON: `RAI ≥ ${sg(thr.TSON)}`, ON: `${sg(thr.TON)} تا ${sg(thr.TSON)}`, NEU: `${sg(thr.TOFF)} تا ${sg(thr.TON)}`, OFF: `${sg(thr.TSOFF)} تا ${sg(thr.TOFF)}`, SOFF: `RAI ≤ ${sg(thr.TSOFF)}` };
+  const step = (n, title, body) => `<div class="g-step"><span class="g-num">${n}</span><div><h4>${title}</h4>${body}</div></div>`;
+  const head = (id, title, sub) => `<div class="section-title g-sec" id="g-${id}"><h2>${title}</h2>${sub ? `<p>${sub}</p>` : ''}</div>`;
+  const TOC = [['what', 'در یک نگاه'], ['today', 'امروز را با هم بخوانیم'], ['weather', '۵ حالت بازار'], ['routine', 'روتین ۲ دقیقه‌ای'],
+    ['tabs', 'هر بخش سایت'], ['how', 'ماشین چطور فکر می‌کند؟'], ['mistakes', 'اشتباه‌های رایج'], ['faq', 'سؤال‌های رایج'], ['words', 'واژه‌نامه'], ['pro', 'جزئیات فنی']];
   el.innerHTML = `
-  <div class="page-head fade-in"><div><h1>روش‌شناسی و راهنما</h1><p>این مدل دقیقاً همان منطق نسخه Excel را اجرا می‌کند.</p></div></div>
-  <div class="grid fade-in"><div class="card c8"><div class="prose">
-    <h3>این ابزار چه می‌کند؟</h3>
-    <p>${D.inds.length - 1} شاخص بازار (به‌علاوه یک Custom slot) در 5 Category ترکیب می‌شوند: Volatility، Credit، FX، Equities & Growth و Funding & USD. حاصل، Risk Appetite Index (RAI) است. بر اساس RAI رژیم بازار برچسب می‌خورد (از Strong Risk-On تا Strong Risk-Off) و 11 Regime type مشخص می‌کنند Risk-Off یا Risk-On از چه نوعی است؛ چون در بازار FX، نوع رژیم تعیین می‌کند کدام Safe haven کار می‌کند.</p>
-    <h3>ترتیب پیشنهادی خواندن</h3>
-    <p>1) رژیم تأییدشده و RAI: جهت کلی. 2) تغییر ۵ روزه: Momentum و نقطه چرخش. 3) Regime type: چرا؟ 4) هشدارها: Divergenceها. 5) Categoryها و شاخص‌ها: کدام بخش بازار رهبری می‌کند. 6) FX Board: آیا ارزها همان رفتاری را دارند که رژیم انتظار دارد؟</p>
-    <h3>روش‌شناسی</h3>
-    <p><b>Transformها:</b> LEVEL = خود سطح (Volatility و Spreadها)؛ RET = Log return ${D.meta.nw} روزه؛ DD = Drawdown از سقف ${D.meta.lb} روزه؛ CP10 = میانگین ۱۰ روزه CP – T-bill spread.</p>
-    <p><b>Rolling z-score:</b> z = (x − Mean ${D.meta.lb} روز) ÷ Std dev ${D.meta.lb} روز، Capped در ±${D.meta.cap}. جهت هر شاخص طوری اعمال می‌شود که مثبت همیشه یعنی Risk-On (Signed z).</p>
-    <p><b>Categoryها و RAI:</b> Score هر Category میانگین Signed z شاخص‌های در دسترس است؛ RAI میانگین وزنی Categoryهاست و اگر داده‌ای نباشد وزن‌ها دوباره نرمال می‌شوند.</p>
-    <p><b>Smoothing و Confirmation:</b> RAI با EMA ${D.meta.span} روزه هموار می‌شود؛ رژیم فقط وقتی عوض می‌شود که برچسب جدید ${D.meta.k} روز پیاپی تکرار شود.</p>
-    <p><b>تشخیص Regime type:</b> هر الگو 5 شرط روی z-score تغییرات ۲۰ روزه (Yields، Breakeven، Real yield، WTI، USDJPY، USD)، Category scoreها و Correlationها دارد. نوع اصلی از میان الگوهای هم‌خانواده با رژیم فعلی انتخاب می‌شود.</p>
-    <h3>داده‌ها و به‌روزرسانی</h3>
-    <p>هر روز پس از بسته شدن بازار آمریکا، داده‌ها خودکار از FRED دریافت می‌شوند. نرخ‌های FX در FRED (سری H.10) هفتگی منتشر می‌شوند؛ روزهای بعد از آخرین انتشار با ECB reference rates روزانه تخمین زده می‌شوند (برچسب <span class="est-tag">ECB</span>) و با انتشار FRED جایگزین می‌شوند. داده‌های ICE BofA (HY, IG, EM spreads) طبق شرایط FRED فقط به‌صورت z-score نمایش داده می‌شوند.</p>
-    <h3>محدودیت‌ها</h3>
-    <p>z-score نسبی است: پس از یک سال آرام، افزایش معمولی هم «استرس» دیده می‌شود. Spreadهای ICE در FRED فقط از نوامبر 2023 در دسترس‌اند. شاخص، رژیم را نشان می‌دهد نه Entry point؛ آن را با Positioning، Valuation و Catalystها ترکیب کنید.</p>
-    <h3>سازنده</h3>
-    <p>طراحی و توسعه: ${TG}. برای پیشنهاد، گزارش خطا یا سؤال در Telegram پیام بدهید.</p>
+  <div class="page-head fade-in"><div><h1>راهنمای استفاده</h1><p>همه‌چیز به زبان ساده؛ لازم نیست چیزی از قبل بدانی.</p></div></div>
+  <div class="g-toc fade-in">${TOC.map(([id, t]) => `<button data-go="g-${id}">${t}</button>`).join('')}</div>
+
+  ${head('what', 'این سایت در یک نگاه')}
+  <div class="grid fade-in">
+    <div class="card c7 g-hero">
+      <p class="g-big">این سایت مثل <b>پیش‌بینی هوا</b> است، ولی برای بازارهای مالی.</p>
+      <p>هر روز ده‌ها عدد از بازار جهانی جمع می‌کند و به یک سؤال ساده جواب می‌دهد:</p>
+      <p class="g-q">«امروز سرمایه‌گذارهای دنیا <b>شجاع‌اند</b> یا <b>ترسیده‌اند</b>؟»</p>
+      <p>وقتی شجاع‌اند می‌گوییم <b>Risk-On</b> (هوا آفتابی است ☀️). وقتی ترسیده‌اند می‌گوییم <b>Risk-Off</b> (هوا طوفانی است ⛈️).</p>
+      <p>چرا مهم است؟ چون در هوای آفتابی بعضی ارزها (مثل AUD و MXN) بالا می‌روند و در هوای طوفانی ارزهای دیگری (مثل JPY و CHF). اگر بدانی هوا چطور است، می‌دانی کدام طرف بایستی و با چه اندازه‌ای معامله کنی.</p>
+    </div>
+    <div class="card c5">
+      <h3 style="font-size:15.5px;margin-bottom:12px">سه چیزی که این سایت به تو می‌گوید</h3>
+      ${step(1, 'هوا چطور است؟', '<p>رژیم بازار: یکی از ۵ حالت، از Strong Risk-On (خیلی آفتابی) تا Strong Risk-Off (خیلی طوفانی).</p>')}
+      ${step(2, 'چرا این‌طور است؟', '<p>Regime type: مثلاً «ترس از رکود» یا «فشار روی شرکت‌های بدهکار». هر دلیل، درمان خودش را دارد.</p>')}
+      ${step(3, 'حالا چه کنم؟', '<p>Playbook: کدام ارزها را بخری، از کدام دوری کنی و چقدر ریسک کنی.</p>')}
+    </div>
+  </div>
+
+  ${head('today', 'امروز را با هم بخوانیم', `با داده‌های واقعیِ ${N(k.date)}؛ هر روز خودکار عوض می‌شود.`)}
+  <div class="card fade-in g-today rc-${g.k}">
+    ${step(1, `هوا: ${WX[g.k].ic} ${chipReg(k.regime)}`, `<p>${WX[g.k].sky}. ${WX[g.k].plain}</p>`)}
+    ${step(2, `دماسنج (RAI): ${N(f2(k.ema))}`, `<p>صفر یعنی عادی؛ هرچه منفی‌تر، ترس بیشتر. ${k.d5 < 0 ? `در ۵ روز گذشته <b>بدتر</b> شده (${N(sg(k.d5))}).` : `در ۵ روز گذشته <b>بهتر</b> شده (${N(sg(k.d5))}).`} فقط ${N(Math.round(k.pct * 100) + '%')} روزهای ثبت‌شده این‌قدر یا بیشتر ${k.ema < 0 ? 'ترسناک' : 'پایین'} بوده‌اند.</p>`)}
+    ${step(3, `چند روز است؟ ${N(k.days)} روز`, `<p>این حالت ${N(k.days)} روز است که ادامه دارد. ${N(Math.round(k.breadth * 100) + '%')} شاخص‌ها مثبت‌اند (Breadth)؛ ${k.breadth < 0.4 ? 'یعنی بیشتر نشانه‌ها منفی‌اند.' : k.breadth > 0.6 ? 'یعنی بیشتر نشانه‌ها مثبت‌اند.' : 'یعنی نشانه‌ها نصف‌نصف‌اند.'}</p>`)}
+    ${step(4, `چرا؟ <span class="en">${prim.en}</span>`, `<p>${prim.sig} (${N(prim.met + ' از 5')} نشانه‌ی این الگو دیده می‌شود.)${sec ? ` الگوی دوم: <b class="en">${sec.en}</b>.` : ''}</p>`)}
+    ${step(5, 'حالا چه کنم؟', `<p><b>Long:</b> ${prim.long}<br><b>Short / Avoid:</b> ${prim.short}<br><b>Risk budget:</b> ${N(budget + '%')}؛ یعنی اگر معمولاً با ۱۰ واحد ریسک معامله می‌کنی، الان حدود ${N(String(Math.round(budget / 10)))} واحد.</p>`)}
+    ${step(6, `هشدارها: ${N(onA.length)} مورد فعال`, onA.length ? `<ul class="g-list">${onA.map(a => `<li>${a.t}</li>`).join('')}</ul>` : '<p>هیچ هشدار فعالی نیست.</p>')}
+  </div>
+
+  ${head('weather', '۵ حالت بازار', 'هر حالت یعنی چه و در آن چه کنیم؟')}
+  <div class="g-weather fade-in">${['SON', 'ON', 'NEU', 'OFF', 'SOFF'].map(key => {
+    const lab = BYN[{ SON: 2, ON: 1, NEU: 0, OFF: -1, SOFF: -2 }[key]], r = D.regimes.find(x => x.reg === lab);
+    return `<div class="g-wx rc-${key} ${key === g.k ? 'now' : ''}">
+      <div class="g-wx-top"><span class="g-ic">${WX[key].ic}</span>${key === g.k ? '<span class="chip ghost">امروز</span>' : ''}</div>
+      <h3 class="en">${lab}</h3><div class="muted" style="font-size:12.5px">${WX[key].sky} · ${N(range[key])}</div>
+      <p>${WX[key].plain}</p><p class="g-todo"><b>چه کنم؟</b> ${WX[key].todo}</p>
+      <div class="g-budget"><span>Risk budget</span><div class="budget-bar"><i style="width:${r.budget * 100}%"></i></div><b class="num">${Math.round(r.budget * 100)}%</b></div>
+    </div>`;
+  }).join('')}</div>
+
+  ${head('routine', 'روتین ۲ دقیقه‌ای هر روز', 'هر روز همین ۶ قدم را به ترتیب برو.')}
+  <div class="grid fade-in"><div class="card c12 g-steps">
+    ${step(1, 'اسم و رنگ رژیم را ببین', '<p>بالای صفحه‌ی <a href="#overview">نمای کلی</a>. قرمز یعنی ترس، آبی یعنی شجاعت، خاکستری یعنی نامعلوم.</p>')}
+    ${step(2, 'جهت را ببین: بهتر می‌شود یا بدتر؟', '<p>روی نوار رنگی، دایره‌ی بزرگ امروز است و نقطه‌ی کوچک ۵ روز پیش. اگر دایره به سمت راست (آبی) رفته، اوضاع بهتر شده؛ اگر به سمت چپ (قرمز) رفته، بدتر. عدد Δ5 زیر RAI هم همین را می‌گوید.</p>')}
+    ${step(3, 'دلیل را بخوان', '<p>کارت «چرا …؟» در <a href="#overview">نمای کلی</a>: نوع اصلی رژیم و ۵ نشانه‌اش (✓ یعنی آن نشانه دیده می‌شود).</p>')}
+    ${step(4, 'کارت‌های Long و Short را بخوان', '<p>همان‌جا: کدام ارزها معمولاً در این وضعیت قوی‌اند و کدام ضعیف. کارت Invalidation می‌گوید چه چیزی این داستان را باطل می‌کند.</p>')}
+    ${step(5, 'هشدارهای زرد را چک کن', '<p>مثلث زرد ⚠ یعنی چیزی غیرعادی است. هشدارها معمولاً زودتر از تغییر رژیم خبر می‌دهند.</p>')}
+    ${step(6, 'ارز خودت را در FX Board پیدا کن', '<p>در <a href="#fx">FX Board</a> ببین ارزی که می‌خواهی معامله کنی «طبق انتظار» رفتار می‌کند یا ⚠ دارد. بعد اندازه‌ی معامله را با Risk budget تنظیم کن.</p>')}
   </div></div>
-  <div class="card c4 flush"><div class="card-h" style="padding:20px 20px 0"><h3>Data dictionary</h3></div>
-    <div class="tbl-wrap" style="padding:0 16px 12px;max-height:720px;overflow:auto"><table class="tbl"><thead><tr><th>سری</th><th>FRED</th></tr></thead><tbody>
-    ${D.datacols.map(c => `<tr><td style="white-space:normal"><b class="en">${c.h}</b>${c.note ? `<div class="muted" style="font-size:11.5px">${c.note}</div>` : ''}</td><td class="num muted" style="font-size:12px">${c.fred || '—'}</td></tr>`).join('')}
-    </tbody></table></div></div></div>`;
+
+  ${head('tabs', 'هر بخش سایت به چه کاری می‌آید؟')}
+  <div class="g-tabs fade-in">${[
+    ['overview', 'نمای کلی', 'الان بازار چه حالی دارد؟', 'هر روز', 'همه‌ی چیزهای مهم در یک صفحه: رژیم، دماسنج RAI، دلیل، هشدارها و نمره‌ی ۵ Category.'],
+    ['history', 'تاریخچه و آمار', 'قبلاً چنین وضعی کی بوده و بعدش چه شد؟', 'هفته‌ای یک بار', 'نمودار RAI در کنار S&P 500 و ارزها، همه‌ی دوره‌های رژیم و اینکه بعد از هر رژیم بازار معمولاً چه کرده. دکمه‌ی دانلود CSV هم دارد.'],
+    ['fx', 'FX Board', 'کدام ارزها قوی‌اند و کدام ضعیف؟', 'قبل از هر معامله', 'عملکرد ۱۵ ارز در برابر USD. ستون «سازگاری با رژیم» می‌گوید هر ارز طبق انتظار رفتار می‌کند یا نه.'],
+    ['indicators', 'شاخص‌ها', 'کدام تکه‌ی پازل باعث این وضع شده؟', 'وقتی کنجکاوی', 'هر شاخص یک کارت دارد: عدد امروز، نمودار ۶ ماه و اینکه داده‌اش تازه است یا نه.'],
+    ['playbook', 'الگوها و Playbook', 'در هر نوع رژیم معمولاً چه کار می‌کنند؟', 'برای یادگیری', 'همه‌ی ۱۱ الگو با نشانه‌ها و راهنمای عملی. الگوی امروز با حاشیه‌ی رنگی مشخص است.'],
+    ['lab', 'Model Lab', 'اگر تنظیمات را عوض کنم چه می‌شود؟', 'برای حرفه‌ای‌ها', 'با اسلایدرها بازی کن تا ببینی مدل چطور تغییر می‌کند. چیزی خراب نمی‌شود؛ با دکمه‌ی «بازگشت به پیش‌فرض» یا رفرش صفحه همه‌چیز برمی‌گردد.'],
+  ].map(([h, t, q, when, d]) => `<a class="g-tab" href="#${h}"><div class="flex" style="justify-content:space-between"><h3>${t}</h3><span class="chip ghost">${when}</span></div>
+      <p class="g-tq">«${q}»</p><p>${d}</p></a>`).join('')}</div>
+
+  ${head('how', 'ماشین چطور فکر می‌کند؟', 'مثل معدل گرفتن از یک کارنامه.')}
+  <div class="grid fade-in">
+    <div class="card c7 g-steps">
+      ${step(1, 'جمع کردن عددها', `<p>هر روز ${N(D.inds.length - 1)} عدد از بازار جمع می‌شود؛ مثل VIX، S&P 500، نرخ ارزها و Spreadها.</p>`)}
+      ${step(2, 'مقایسه با یک سال گذشته', '<p>هر عدد با یک سال گذشته‌ی خودش مقایسه می‌شود (z-score). سؤال این است: «امروز عادی است یا غیرعادی؟» مثلاً VIX = 20 در یک سال آرام زیاد است، ولی در یک سال پرتنش عادی.</p>')}
+      ${step(3, 'نمره‌ی هر درس', '<p>عددها در ۵ گروه (Category) جمع می‌شوند و هر گروه یک نمره می‌گیرد؛ مثل نمره‌ی ۵ درس.</p>')}
+      ${step(4, 'معدل', '<p>میانگین این ۵ نمره می‌شود <b>RAI</b>. بعد با EMA کمی نرم می‌شود تا یک روز عجیب همه‌چیز را به هم نریزد.</p>')}
+      ${step(5, 'برچسب زدن', `<p>RAI با خط‌کش مقایسه می‌شود (بخش «۵ حالت بازار» را ببین) و رژیم مشخص می‌شود. ولی رژیم فقط وقتی عوض می‌شود که حالت جدید <b>${N(K)} روز پشت سر هم</b> تکرار شود؛ با یک روز باران نمی‌گوییم زمستان شده.</p>`)}
+      ${step(6, 'پیدا کردن دلیل', '<p>۱۱ الگو بررسی می‌شوند. هر الگو ۵ سؤال بله/خیر دارد (مثلاً «آیا JPY قوی شده؟»). الگویی که بیشترین «بله» را بگیرد، نوع اصلی رژیم است.</p>')}
+    </div>
+    <div class="card c5">
+      <h3 style="font-size:15.5px;margin-bottom:12px">۵ درسِ کارنامه</h3>
+      ${D.cats.map(c => `<div class="g-cat"><span class="g-dot" style="background:var(${CATCOL[c.code]})"></span><div><b class="en">${c.en}</b> <span class="muted">· ${CAT_SIMPLE[c.code][0]} · وزن ${N(Math.round(c.w * 100) + '%')}</span><p>${CAT_SIMPLE[c.code][1]}</p></div></div>`).join('')}
+      <p class="note">در همه‌ی سایت، عدد مثبت یعنی «خوب برای ریسک» و عدد منفی یعنی «ترس».</p>
+    </div>
+  </div>
+
+  ${head('mistakes', 'اشتباه‌های رایج')}
+  <div class="g-mis fade-in">${[
+    ['فکر کنی Strong Risk-Off یعنی «همین الان بفروش».', 'یعنی «هوا طوفانی است؛ کوچک‌تر و محتاط‌تر معامله کن». نقطه‌ی ورود را با تحلیل خودت پیدا کن.'],
+    ['با یک روز بد تصمیم بگیری.', 'به جهت چند روزه نگاه کن (Δ5 و رنگ‌های نمودار RAI).'],
+    ['فقط به اسم رژیم نگاه کنی.', 'دلیل (Regime type) مهم‌تر است؛ مثلاً در Inflation Shock، JPY دیگر جای امن نیست.'],
+    ['فکر کنی عددها لحظه‌ای‌اند.', 'داده‌ها مربوط به بسته شدن روز قبلِ بازار آمریکا هستند. تاریخ آخرین داده بالای صفحه است.'],
+  ].map(([bad, good]) => `<div class="card"><p class="g-bad">✗ ${bad}</p><p class="g-good">✓ ${good}</p></div>`).join('')}</div>
+
+  ${head('faq', 'سؤال‌های رایج')}
+  <div class="card fade-in g-faq">${[
+    ['سایت کی به‌روز می‌شود؟', 'هر روز کاری، خودکار و دو بار: حدود ساعت ۰۲:۰۰ و ۱۷:۳۰ به وقت تهران. تاریخ آخرین داده بالای صفحه نوشته شده.'],
+    ['RAI از خط رد شد ولی رژیم عوض نشد. چرا؟', `به‌خاطر قانون صبر (Confirmation): حالت جدید باید ${K} روز پشت سر هم تکرار شود. تا آن موقع، Raw signal را زیر اسم رژیم ببین.`],
+    ['برچسب زرد ECB یعنی چه؟', 'FRED نرخ ارزها را هفته‌ای یک بار منتشر می‌کند. برای روزهای بین، نرخ را از بانک مرکزی اروپا (ECB) تخمین می‌زنیم. خطای این تخمین معمولاً کمتر از نیم درصد است و بعداً عدد رسمی جایش می‌نشیند.'],
+    ['هشدارها با رژیم جور درنمی‌آیند. یعنی چه؟', 'یعنی احتمال تغییر وجود دارد. مثلاً رژیم Risk-On است ولی هشدار «Credit رالی Equities را تأیید نمی‌کند» فعال شده؛ پس با احتیاط بیشتر جلو برو.'],
+    ['چرا Spreadهای HY و IG عدد خام ندارند؟', 'طبق شرایط استفاده از داده‌های ICE BofA در FRED، فقط z-score آن‌ها را نشان می‌دهیم.'],
+    ['این ابزار به من می‌گوید چه بخرم؟', 'نه. فقط می‌گوید هوای بازار چطور است و معمولاً در چنین هوایی چه چیزهایی خوب کار می‌کنند. این ابزار آموزشی است و توصیه‌ی سرمایه‌گذاری نیست.'],
+    ['سؤال یا پیشنهاد دارم.', `در Telegram به ${TG} پیام بده.`],
+  ].map(([q, a]) => `<details><summary><span>${q}</span></summary><p>${a}</p></details>`).join('')}</div>
+
+  ${head('words', 'واژه‌نامه', 'همه‌ی کلمه‌های تخصصی سایت، به زبان ساده.')}
+  <div class="fade-in"><input class="g-search" id="gSearch" type="search" placeholder="جست‌وجو… (مثلاً Carry یا ترس)">
+  <div class="g-words" id="gWords">${GLOSSARY.map(([t, d]) => `<div class="g-word"><b class="en">${t}</b><p>${d}</p></div>`).join('')}</div></div>
+
+  ${head('pro', 'برای حرفه‌ای‌ها: جزئیات فنی', 'اگر تازه‌کاری، این بخش را لازم نداری.')}
+  <details class="card fade-in g-pro"><summary>نمایش جزئیات فنی و فهرست داده‌ها</summary>
+    <div class="grid" style="margin-top:14px"><div class="c8 prose">
+      <p><b>Transformها:</b> LEVEL = خود سطح (Volatility و Spreadها)؛ RET = Log return ${D.meta.nw} روزه؛ DD = Drawdown از سقف ${D.meta.lb} روزه؛ CP10 = میانگین ۱۰ روزه CP – T-bill spread.</p>
+      <p><b>Rolling z-score:</b> z = (x − Mean ${D.meta.lb} روز) ÷ Std dev ${D.meta.lb} روز، Capped در ±${D.meta.cap}، ضربدر جهت شاخص (Signed z).</p>
+      <p><b>Categoryها و RAI:</b> Score هر Category میانگین Signed z شاخص‌های در دسترس است؛ RAI میانگین وزنی Categoryهاست و اگر داده‌ای نباشد وزن‌ها دوباره نرمال می‌شوند.</p>
+      <p><b>Smoothing و Confirmation:</b> EMA ${D.meta.span} روزه؛ رژیم پس از ${K} روز پیاپی برچسب جدید عوض می‌شود. آستانه‌ها: ${N(range.SON)}، ${N(range.ON)}، ${N(range.NEU)}، ${N(range.OFF)}، ${N(range.SOFF)}.</p>
+      <p><b>Regime type:</b> 5 شرط روی z-score تغییرات ${D.meta.nw} روزه (Yields، Breakeven، Real yield، WTI، USDJPY، USD)، Category scoreها و Correlationها. هر شرط یک Margin بین −1 و +1 دارد؛ Strength = میانگین Marginها. نوع اصلی از میان الگوهای هم‌خانواده با رژیم فعلی انتخاب می‌شود.</p>
+      <p><b>داده:</b> FRED، و برای روزهای بعد از آخرین انتشار هفتگی H.10، ECB reference rates (با زنجیر کردن تغییرات روزانه روی آخرین عدد FRED). Spreadهای ICE در FRED فقط از نوامبر 2023 در دسترس‌اند.</p>
+      <p><b>محدودیت‌ها:</b> z-score نسبی است؛ پس از یک سال آرام، افزایش معمولی هم «استرس» دیده می‌شود. شاخص رژیم را نشان می‌دهد نه Entry point؛ آن را با Positioning، Valuation و Catalystها ترکیب کن.</p>
+    </div>
+    <div class="c4"><div class="tbl-wrap" style="max-height:520px;overflow:auto"><table class="tbl"><thead><tr><th>Data dictionary</th><th>FRED</th></tr></thead><tbody>
+      ${D.datacols.map(c => `<tr><td style="white-space:normal"><b class="en">${c.h}</b>${c.note ? `<div class="muted" style="font-size:11.5px">${c.note}</div>` : ''}</td><td class="num muted" style="font-size:12px">${c.fred || '—'}</td></tr>`).join('')}
+    </tbody></table></div></div></div>
+  </details>
+
+  <div class="card fade-in g-maker"><span>این سایت را ${TG} ساخته است. هر سؤال یا پیشنهادی داری، در Telegram پیام بده.</span></div>`;
+  el.addEventListener('click', e => {
+    const b = e.target.closest('[data-go]'); if (!b) return;
+    const t = document.getElementById(b.dataset.go);
+    if (t) scrollTo({ top: t.getBoundingClientRect().top + scrollY - 120, behavior: 'smooth' });
+  });
+  $('#gSearch', el).addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    $$('.g-word', el).forEach(w => { w.hidden = q && !w.textContent.toLowerCase().includes(q); });
+  });
 }
 
 /* ================= router / boot ================= */
