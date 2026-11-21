@@ -1,8 +1,20 @@
 # Risk Regime Monitor — project context for Claude Code
 
-FX-focused Risk-On / Risk-Off regime monitor (hedge-fund style). Output is an Excel workbook
-`output/RiskRegimeMonitor.xlsx` driven entirely by formulas; Python builds it and feeds data.
-The user writes in Persian; reply in Persian. Workbook labels are Persian + English terms.
+FX-focused Risk-On / Risk-Off regime monitor (hedge-fund style). The primary product is now the web dashboard
+in `site/` (GitHub Pages, auto-updated); the Excel workbook was the prototype.
+The user writes in Persian; reply in Persian.
+
+**Wording rule (from the user):** Persian sentences, but keep financial terms and titles in English — regime
+labels (Strong Risk-Off), category names (Credit), type names (Credit Stress), and jargon such as Carry, Safe haven,
+Tail risk, High-beta, Spread, Defaults, Leveraged sectors, Private credit. Never write Persian calques like
+«ریسک دنباله»، «پربتا»، «پناهگاه»، «نکول». Write currency lists with English commas: (AUD, NZD, ZAR).
+
+## Deployment
+- Repo: https://github.com/SinaFXD/RiskRegimeMonitor (public) · Site: https://sinafxd.github.io/RiskRegimeMonitor/
+- `.github/workflows/update.yml`: weekdays 22:30 and 14:00 UTC (+ on push / manual) → fetch_fred.py (+ECB) →
+  export_site.py → commits `site/data/latest.json` → deploys `site/` to Pages. Raw `/data/` is NOT committed
+  (ICE BofA / S&P / CBOE redistribution terms); the workflow keeps it in actions/cache. ICE spreads are shown as z only.
+- `/template/`, `/output/`, `*.xlsx` are git-ignored (the user's Excel stays local).
 
 ## Files
 - `spec.py` — single source of truth: Data columns (letter, key, FRED id, TradingView ticker),
