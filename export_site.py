@@ -8,7 +8,7 @@ Everything the Excel Dashboard / FX Board / Playbook shows is computed here; the
 import os, json, math, warnings
 import numpy as np, pandas as pd
 from spec import *
-from playbook import TYPES, FX
+from playbook import TYPES, TYPES_EN, FX
 from reference2 import reference, diag_latest, type_scores
 
 warnings.filterwarnings('ignore', message='.*dayofweek')
@@ -148,7 +148,9 @@ def main():
                 x = D[key]
             ok = bool((x - thr) * (1 if op == '>' else -1) > 0)
             cv.append(dict(k=key, op=op, thr=thr, v=num(x, 3), ok=ok))
+        e_sig, e_lg, e_sh, e_hd, e_inv = TYPES_EN[code]
         types.append(dict(code=code, en=en, fa=fa, fam=fam, sig=sig, long=lg, short=sh, hedge=hd, inv=inv,
+                          sig_en=e_sig, long_en=e_lg, short_en=e_sh, hedge_en=e_hd, inv_en=e_inv,
                           met=ts[code][0], str=num(ts[code][1], 3), conds=cv))
 
     th = []
@@ -167,21 +169,36 @@ def main():
     stale_n = sum(i['stale'] for i in inds if i['id'] not in ('MOVE', 'C1'))
     n_cats = sum(v is not None for v in E.values())
     ro = 'Off' in reg
-    A = [
-        ('VIX term structure معکوس شده (VIX > VIX3M) — استرس حاد', V['VIXR'] > 1, f"{V['VIXR']:.2f}", '> 1.00'),
-        ('Credit رالی Equities را تأیید نمی‌کند', E['EQ'] > 0.25 and E['CREDIT'] < -0.5, f"{E['EQ']:.2f} / {E['CREDIT']:.2f}", 'Equities > 0.25 و Credit < −0.5'),
-        ('FX زودتر از Equities هشدار می‌دهد', E['FX'] < -0.75 and E['EQ'] > 0, f"{E['FX']:.2f} / {E['EQ']:.2f}", 'FX < −0.75 و Equities > 0'),
-        ('USD funding stress', max(V['USD'], V['CPZ']) > 1.5, f"{max(V['USD'], V['CPZ']):.2f}", 'USD z یا CP spread z > 1.5'),
-        ('Breadth divergence', (kpi['rai'] > 0 and kpi['breadth'] < 0.4) or (kpi['rai'] < 0 and kpi['breadth'] > 0.6), f"{kpi['breadth']:.0%}", 'RAI > 0 و Breadth < 40% یا برعکس'),
-        ('JPY نقش Safe haven را بازی نمی‌کند', ro and V['JPY'] > 0.25, f"{V['JPY']:.2f}", 'Risk-Off و USDJPY z > 0.25'),
-        ('Correlation spike (حرکت گله‌ای Macro)', V['AVGC'] > 0.5, f"{V['AVGC']:.2f}", '> 0.50'),
-        ('Treasuries دیگر Hedge سهام نیستند (Stock–bond correlation منفی)', V['SBC'] < -0.2, f"{V['SBC']:.2f}", '< −0.20'),
-        ('وخامت سریع (افت ۵ روزه RAI)', kpi['d5'] < -0.5, f"{kpi['d5']:+.2f}", 'Δ5 < −0.50'),
-        ('احتمال Bottoming (بهبود در دل استرس)', kpi['ema'] < -0.75 and kpi['d5'] > 0.3, f"{kpi['d5']:+.2f}", 'RAI < −0.75 و Δ5 > +0.30'),
-        ('Stale data', stale_n > 0, f'{stale_n} شاخص', f'قدیمی‌تر از {STALE} روز'),
-        ('پوشش ناقص Categories', n_cats < 5, f'{n_cats} / 5', '5 Category'),
+    A = [  # (text fa, text en), on, value, threshold -- value/threshold may be a (fa, en) pair
+        (('VIX term structure معکوس شده (VIX > VIX3M) — استرس حاد', 'VIX term structure inverted (VIX > VIX3M) — acute stress'),
+         V['VIXR'] > 1, f"{V['VIXR']:.2f}", '> 1.00'),
+        (('Credit رالی Equities را تأیید نمی‌کند', 'Credit is not confirming the equity rally'),
+         E['EQ'] > 0.25 and E['CREDIT'] < -0.5, f"{E['EQ']:.2f} / {E['CREDIT']:.2f}", ('Equities > 0.25 و Credit < −0.5', 'Equities > 0.25 and Credit < −0.5')),
+        (('FX زودتر از Equities هشدار می‌دهد', 'FX is warning ahead of equities'),
+         E['FX'] < -0.75 and E['EQ'] > 0, f"{E['FX']:.2f} / {E['EQ']:.2f}", ('FX < −0.75 و Equities > 0', 'FX < −0.75 and Equities > 0')),
+        (('USD funding stress', 'USD funding stress'),
+         max(V['USD'], V['CPZ']) > 1.5, f"{max(V['USD'], V['CPZ']):.2f}", ('USD z یا CP spread z > 1.5', 'USD z or CP spread z > 1.5')),
+        (('Breadth divergence', 'Breadth divergence'),
+         (kpi['rai'] > 0 and kpi['breadth'] < 0.4) or (kpi['rai'] < 0 and kpi['breadth'] > 0.6), f"{kpi['breadth']:.0%}",
+         ('RAI > 0 و Breadth < 40% یا برعکس', 'RAI > 0 and Breadth < 40%, or the reverse')),
+        (('JPY نقش Safe haven را بازی نمی‌کند', 'JPY is not acting as a Safe haven'),
+         ro and V['JPY'] > 0.25, f"{V['JPY']:.2f}", ('Risk-Off و USDJPY z > 0.25', 'Risk-Off and USDJPY z > 0.25')),
+        (('Correlation spike (حرکت گله‌ای Macro)', 'Correlation spike (macro herding)'),
+         V['AVGC'] > 0.5, f"{V['AVGC']:.2f}", '> 0.50'),
+        (('Treasuries دیگر Hedge سهام نیستند (Stock–bond correlation منفی)', 'Treasuries no longer hedge equities (negative stock–bond correlation)'),
+         V['SBC'] < -0.2, f"{V['SBC']:.2f}", '< −0.20'),
+        (('وخامت سریع (افت ۵ روزه RAI)', 'Rapid deterioration (5-day RAI drop)'),
+         kpi['d5'] < -0.5, f"{kpi['d5']:+.2f}", 'Δ5 < −0.50'),
+        (('احتمال Bottoming (بهبود در دل استرس)', 'Possible bottoming (improvement under stress)'),
+         kpi['ema'] < -0.75 and kpi['d5'] > 0.3, f"{kpi['d5']:+.2f}", ('RAI < −0.75 و Δ5 > +0.30', 'RAI < −0.75 and Δ5 > +0.30')),
+        (('Stale data', 'Stale data'),
+         stale_n > 0, (f'{stale_n} شاخص', f'{stale_n} indicators'), (f'قدیمی‌تر از {STALE} روز', f'older than {STALE} days')),
+        (('پوشش ناقص Categories', 'Incomplete category coverage'),
+         n_cats < 5, f'{n_cats} / 5', '5 Category'),
     ]
-    alerts = [dict(t=t, on=bool(on), v=v, thr=thr) for t, on, v, thr in A]
+    two = lambda x: x if isinstance(x, tuple) else (x, x)
+    alerts = [dict(t=t[0], t_en=t[1], on=bool(on), v=two(v)[0], v_en=two(v)[1], thr=two(thr)[0], thr_en=two(thr)[1])
+              for t, on, v, thr in A]
 
     # ---- diagnosis inputs table ----
     def pct_chg(s, n=NW):
@@ -191,31 +208,31 @@ def main():
         v = df[k].dropna()
         return num((v.iloc[-1] - v.iloc[-1 - NW]) * 100, 1) if kind == 'bp' else num(v.iloc[-1] / v.iloc[-1 - NW] - 1)
     DIAG = [
-        ('EQ', 'S&P 500 momentum (20d)', pct_chg(c['SPX']), 'pct', 'تغییر ۲۰ روزه S&P 500'),
-        ('Y10', 'UST 10Y yield (20d change)', obs_chg('UST10Y', 'bp'), 'bp', 'مثبت = بازده بالا رفته (Bond sell-off)'),
-        ('Y2', 'UST 2Y yield (20d change)', obs_chg('UST2Y', 'bp'), 'bp', 'انتظارات Policy rate'),
+        ('EQ', 'S&P 500 momentum (20d)', pct_chg(c['SPX']), 'pct', ('تغییر ۲۰ روزه S&P 500', '20-day change in the S&P 500')),
+        ('Y10', 'UST 10Y yield (20d change)', obs_chg('UST10Y', 'bp'), 'bp', ('مثبت = بازده بالا رفته (Bond sell-off)', 'Positive = yields up (bond sell-off)')),
+        ('Y2', 'UST 2Y yield (20d change)', obs_chg('UST2Y', 'bp'), 'bp', ('انتظارات Policy rate', 'Policy-rate expectations')),
         ('BE', '10Y Breakeven (20d change)', obs_chg('BE10Y', 'bp'), 'bp', 'Inflation expectations'),
         ('RY', '10Y Real yield (20d change)', obs_chg('REAL10Y', 'bp'), 'bp', 'TIPS'),
         ('OIL', 'WTI (20d return)', obs_chg('WTI', 'pct'), 'pct', ''),
-        ('JPY', 'USDJPY (20d return)', obs_chg('USDJPY', 'pct'), 'pct', 'منفی = JPY قوی شده'),
-        ('USD', 'USD Broad (20d return, raw z)', pct_chg(c['USD_BROAD']), 'pct', 'مثبت = USD قوی'),
+        ('JPY', 'USDJPY (20d return)', obs_chg('USDJPY', 'pct'), 'pct', ('منفی = JPY قوی شده', 'Negative = JPY stronger')),
+        ('USD', 'USD Broad (20d return, raw z)', pct_chg(c['USD_BROAD']), 'pct', ('مثبت = USD قوی', 'Positive = strong USD')),
         ('AUDJPY', 'AUDJPY (signed z)', pct_chg(c['AUDJPY']), 'pct', ''),
         ('EMFX', 'EM FX basket (signed z)', pct_chg(c['EMFX']), 'pct', 'MXN, BRL, ZAR, KRW'),
         ('EURCHF', 'EURCHF (signed z)', pct_chg(c['EURCHF']), 'pct', ''),
-        ('HY', 'HY spread (signed z)', None, '', 'منفی = Spread widening'),
+        ('HY', 'HY spread (signed z)', None, '', ('منفی = Spread widening', 'Negative = spread widening')),
         ('IG', 'IG spread (signed z)', None, '', ''),
-        ('CPZ', 'CP – T-bill spread (raw z)', num(X['CP'].iloc[-1], 1), 'bpl', 'مثبت = Funding stress'),
-        ('SBC', 'Stock–bond correlation (60d)', None, '', 'منفی = Treasuries دیگر Hedge سهام نیستند'),
+        ('CPZ', 'CP – T-bill spread (raw z)', num(X['CP'].iloc[-1], 1), 'bpl', ('مثبت = Funding stress', 'Positive = funding stress')),
+        ('SBC', 'Stock–bond correlation (60d)', None, '', ('منفی = Treasuries دیگر Hedge سهام نیستند', 'Negative = Treasuries no longer hedge equities')),
         ('AVGC', 'Avg risk-asset correlation (40d)', None, '', 'S&P 500, AUDJPY, EM FX, HY spread'),
-        ('VIXR', 'VIX ÷ VIX3M', num(c['VIX'].iloc[-1], 2), 'vix', '> 1 یعنی Inverted term structure'),
+        ('VIXR', 'VIX ÷ VIX3M', num(c['VIX'].iloc[-1], 2), 'vix', ('> 1 یعنی Inverted term structure', '> 1 means an inverted term structure')),
     ]
-    diag = [dict(k=k, t=t, z=num(D[k], 3), raw=r, fmt=f, note=n) for k, t, r, f, n in DIAG]
+    diag = [dict(k=k, t=t, z=num(D[k], 3), raw=r, fmt=f, note=two(n)[0], note_en=two(n)[1]) for k, t, r, f, n in DIAG]
     weekly = []
-    for k, fid, t, note in [('STLFSI', 'STLFSI4', 'St. Louis Fed Financial Stress Index', '> 0 = استرس بالاتر از میانگین'),
-                            ('NFCI', 'NFCI', 'Chicago Fed NFCI', '> 0 = Financial conditions سخت‌تر از میانگین')]:
+    for k, fid, t, note in [('STLFSI', 'STLFSI4', 'St. Louis Fed Financial Stress Index', ('> 0 = استرس بالاتر از میانگین', '> 0 = above-average stress')),
+                            ('NFCI', 'NFCI', 'Chicago Fed NFCI', ('> 0 = Financial conditions سخت‌تر از میانگین', '> 0 = tighter-than-average financial conditions'))]:
         w = ld(fid).dropna()
         w = w[w.index >= HIST_START]
-        weekly.append(dict(k=k, t=t, note=note, v=num(w.iloc[-1], 3), date=str(w.index[-1].date()),
+        weekly.append(dict(k=k, t=t, note=note[0], note_en=note[1], v=num(w.iloc[-1], 3), date=str(w.index[-1].date()),
                            dates=[str(d.date()) for d in w.index], vals=arr(w, 3)))
 
     # ---- FX board ----
@@ -279,7 +296,7 @@ def main():
         meta=dict(updated=pd.Timestamp.now(tz='UTC').strftime('%Y-%m-%d %H:%M UTC'), last=str(LD.date()),
                   lb=LB, nw=NW, cap=CAPV, span=SPAN, k=K, thr=THR, stale=STALE,
                   ecb_from=str(min(fills.values()).date()) if fills else None),
-        kpi=kpi, regimes=[dict(reg=l, fa=f, budget=b, post=p) for l, f, b, p in REGIMES],
+        kpi=kpi, regimes=[dict(reg=l, fa=f, budget=b, post=p, post_en=REGIMES_POST_EN[l]) for l, f, b, p in REGIMES],
         cats=cats, inds=inds, types=types, primary=prim, secondary=sec, alerts=alerts, diag=diag, weekly=weekly,
         fx=fx, fxg=gavg, history=history, episodes=eps, stats=stats,
         indicators_def=[dict(id=i[0], cat=i[3], dir=i[6], w=i[7]) for i in INDICATORS],

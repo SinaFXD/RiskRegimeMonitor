@@ -116,6 +116,13 @@ REGIMES = [  # label, fa, budget, posture
  ('Risk-Off','ریسک‌آف',0.35,'کاهش Carry و Leverage؛ سوگیری به Safe haven متناسب با Regime type'),
  ('Strong Risk-Off','ریسک‌آف قوی',0.20,'Capital preservation؛ کاهش Gross؛ Liquidity و Hedging؛ منتظر تأیید Reversal'),
 ]
+REGIMES_POST_EN = {  # English posture text for the web dashboard
+ 'Strong Risk-On': 'Broad risk appetite; Carry and High-beta FX first; hedging is cheap',
+ 'Risk-On': 'Lean into risk selectively; Carry with normal sizing',
+ 'Neutral': 'Signals conflict; relative value and smaller sizing',
+ 'Risk-Off': 'Cut Carry and leverage; tilt to Safe havens according to the regime type',
+ 'Strong Risk-Off': 'Capital preservation; cut gross; liquidity and hedging; wait for a confirmed reversal',
+}
 
 # Config sheet addresses
 CFG = dict(SPAN='Config!$B$6', ALPHA='Config!$B$7', K='Config!$B$8', TSON='Config!$B$9', TON='Config!$B$10',
